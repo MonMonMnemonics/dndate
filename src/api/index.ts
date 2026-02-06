@@ -4,6 +4,7 @@ import { db } from "../lib/database";
 import { poll, user, auxInfo, attendance } from "../lib/schema";
 import { eq, inArray } from "drizzle-orm";
 import moment from "moment";
+import type { UserData } from "@/common/types";
 
 const API = new Hono();
 const tempToken: {[key: string]: number} = {};
@@ -73,7 +74,7 @@ API.post("poll/data", async (ctx) => {
         .where(eq(poll.token, reqData.token))
         .limit(1);
 
-    let userData : any = {};
+    let userData : {[index: string]: UserData} = {};
     
     if (pollData.length > 0) {
         pollData = pollData[0];
@@ -93,14 +94,16 @@ API.post("poll/data", async (ctx) => {
         for (const usr of users) {
             userData[usr.id.toString()] = {
                 name: usr.name,
+                host: usr.host ?? false,
                 attendance: []
             }
         }
 
         for (const att of usersAttendance) {
             if (att.userId) {
-                if (att.userId.toString() in userData) {
-                    userData[att.userId.toString()].attendance.push({
+                const userId = att.userId.toString();
+                if (userData[userId]) {
+                    userData[userId].attendance.push({
                         date: att.date,
                         timeslot: att.timeslot,
                         val: att.val
