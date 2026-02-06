@@ -14,7 +14,8 @@ export function Poll() {
         title: "POLL",
         description: "",
         dateStart: moment().format("YYYY-MM-DD"),
-        dateEnd: moment().format("YYYY-MM-DD")
+        dateEnd: moment().format("YYYY-MM-DD"),
+        timezone: "GMT +00:00"
     })
     const [ dates, setDates ] = useState<string[]>([]);
 
@@ -111,25 +112,33 @@ export function Poll() {
                         </div>
                     </div>
                     <div className="w-px mx-2 bg-white border-0"/>
-                    <div className="grow">
+                    <div className="grow flex flex-col gap-2">
                         <textarea
-                            value={pollData.description + pollData.description + pollData.description + pollData.description + pollData.description + pollData.description}
+                            value={pollData.description}
                             placeholder="Description of the poll is here... If only the host provided one..."
-                            className="transparent-input w-full p-2 rounded border font-light resize-none h-[10em]"
+                            className="transparent-input w-full p-2 rounded border font-light resize-none h-[10em] h-full"
                             readOnly={true}
                         />
+                        <div className="flex flex-row justify-between items-center font-bold text-xl">
+                            <div>Timezone: {pollData.timezone}</div>
+                            <div className="flex flex-row items-center gap-2">
+                                <div>Preferred</div>
+                                <div>Open</div>
+                                <div>No</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             <div className="bg-dark-secondary rounded-lg p-3 border border-gray-500 text-dark-text flex flex-col gap-2 grow">
                 <div className='relative grow select-none flex flex-col'>
                     <div className="h-full w-full absolute overflow-auto p-2">
-                        <table className='table-fixed' style={{ width: 'auto' }}>
+                        <table className='poll table-auto' style={{ width: 'auto' }}>
                             <thead className="sticky top-0">
                                 <tr>
                                     <th rowSpan={2} className='sticky left-0 align-middle text-center' style={{ zIndex: 2 }}>Name</th>
                                     { dates.map(date => (
-                                        <th key={'header-' + date} colSpan={48}>{date}</th>
+                                        <th key={'header-' + date} colSpan={48}>{moment(date).format('YYYY-MM-DD (dddd)')}</th>
                                     ))}
                                 </tr>
                                 <tr>
@@ -141,22 +150,22 @@ export function Poll() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {/*userData.map((user, idx) => (
+                                {userData.map((user, idx) => (
                                     <tr key={'tr-' + idx} style={{ height: '3em' }}>
-                                        <th className='sticky text-nowrap left-0 align-middle px-3 bg-white' style={{ zIndex: 1 }}>
+                                        <th className='sticky text-nowrap left-0 align-middle px-3' style={{ zIndex: 1 }}>
                                             <div className='flex flex-row items-center gap-3 w-full'>
                                                 <div>{user.name}</div>
                                             </div>
                                         </th>
-                                        {dates.map((date) => {
+                                        {/*dates.map((date) => {
                                             return Array.from(Array(24*2).keys()).map((idx2) => {
                                                 return (
                                                     <td key={idx + "-" + date + '-' + idx2} className='bg-light'></td>
                                                 );
                                             })
-                                        })}
+                                        })*/}
                                     </tr>
-                                ))*/}
+                                ))}
                             </tbody>
                         </table>
                     </div>

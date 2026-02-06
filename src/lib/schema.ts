@@ -9,7 +9,8 @@ export const poll = sqliteTable("poll", {
     description: text("description").default(""),
     dateStart: text("date_start").notNull(),
     dateEnd: text("date_end").notNull(),
-    dateUpdated: text("date_updated").notNull()
+    dateUpdated: text("date_updated").notNull(),
+    timezone: text("timezone").notNull()
 }, (table) => [
     check("date_start_check", sql`${table.dateStart} LIKE [0-9][0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]`),
     check("date_end_check", sql`${table.dateEnd} LIKE [0-9][0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]`),

@@ -11,6 +11,42 @@ const extraOpts: {[index: string]: any} = {
     "veils-lines": { text:"Veils (Uncomfortable subjects) and Lines (PTSD-inducing subjects)" , codes: ["veils", "lines"]},
 };
 
+const timezones: string[] = [
+    "GMT -12:00",
+    "GMT -11:00",
+    "GMT -10:00",
+    "GMT -09:30",
+    "GMT -09:00",
+    "GMT -08:00",
+    "GMT -07:00",
+    "GMT -06:00",
+    "GMT -05:00",
+    "GMT -04:30",
+    "GMT -04:00",
+    "GMT -03:30",
+    "GMT -03:00",
+    "GMT -02:00",
+    "GMT -01:00",
+    "GMT +00:00",
+    "GMT +01:00",
+    "GMT +02:00",
+    "GMT +03:00",
+    "GMT +04:00",
+    "GMT +04:30",
+    "GMT +05:00",
+    "GMT +05:30",
+    "GMT +06:00",
+    "GMT +06:30",
+    "GMT +07:00 (WIB)",
+    "GMT +08:00 (WITA)",
+    "GMT +08:30",
+    "GMT +09:00 (WIT)",
+    "GMT +09:30",
+    "GMT +10:00",
+    "GMT +11:00",
+    "GMT +12:00",
+]
+
 export function CreatePoll() {
     const [ name, setName ] = useState("");
     const [ pass, setPass ] = useState("");
@@ -20,6 +56,7 @@ export function CreatePoll() {
     const [ dateEnd, setDateEnd ] = useState(moment().add(7, "d").format('YYYY-MM-DD'));
     const [ optsInfo, setOptInfo ]  = useState<string[]>([]);
     const [ loading, setLoading] = useState(false);
+    const [ timezone, setTimezone ] = useState(timezones[25])
 
     async function createPoll() {
         const swConf = await Swal.fire({
@@ -49,6 +86,7 @@ export function CreatePoll() {
                 desc,
                 dateStart,
                 dateEnd,
+                timezone,
                 opts: optsInfo.map(key => {
                     if (key in extraOpts) {
                         return extraOpts[key].codes;
@@ -171,6 +209,16 @@ export function CreatePoll() {
                             }}/>
 
                         <div className="text-nowrap text-sm">(6 months in advance max)</div>
+                    </div>
+                    <div className="flex flex-row gap-2 items-center w-full">
+                        <div className="text-nowrap text-xl">Timezone:</div>
+                        <select 
+                            value={timezone}
+                            onChange={(e) => setTimezone(e.target.value)}
+                            className="font-bold text-xl px-2"
+                        >
+                            {timezones.map((tz, idx) => <option key={"opt-" + idx} value={tz}>{tz}</option>)}
+                        </select>
                     </div>
                     <div className="flex flex-col gap-1 w-full">
                         <div className="text-nowrap text-xl">Extra opts:</div>

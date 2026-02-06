@@ -68,3 +68,9 @@
     outline: none;
   }
 }
+
+table.poll {
+  th {
+    padding: 2px;
+  }
+}

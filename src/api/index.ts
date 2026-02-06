@@ -25,7 +25,8 @@ API.post('poll/create', async (ctx) => {
         description: reqData.desc,
         dateUpdated: creationDate.clone().format("YYYY-MM-DD"),
         dateStart: reqData.dateStart,
-        dateEnd: reqData.dateEnd
+        dateEnd: reqData.dateEnd,
+        timezone: reqData.timezone
     }).returning({ id: poll.id});
 
     await db.insert(user).values({
@@ -68,7 +69,8 @@ API.post("poll/data", async (ctx) => {
             title: poll.title,
             description: poll.description,
             dateStart: poll.dateStart,
-            dateEnd: poll.dateEnd
+            dateEnd: poll.dateEnd,
+            timezone: poll.timezone
         })
         .from(poll)
         .where(eq(poll.token, reqData.token))
