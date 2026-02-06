@@ -1,43 +1,132 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { db } from "../lib/database";
-import { poll } from "../lib/schema";
+import { poll, user, auxInfo, attendance } from "../lib/schema";
+import { eq, inArray } from "drizzle-orm";
 import moment from "moment";
 
 const API = new Hono();
+const tempToken: {[key: string]: number} = {};
 
-API.get('/hello', (ctx) => {
-    return ctx.json({
-        message: "Hello, world!",
-        method: "GET",
-    })
-});
+API.use('/*', cors({
+    origin: (process.env.NODE_ENV !== "production") ? "*" : "*3mworkshop.org"
+}));
 
-API.get('/hello/:name', (ctx) => {
+API.post('poll/create', async (ctx) => {
+    const reqData = await ctx.req.json();
+    const token = Bun.SHA256.hash(Bun.env.APP_ID + moment().toISOString() + reqData.title, "hex");
+    const pass = await Bun.password.hash(Bun.env.APP_ID + reqData.pass);
+    const creationDate = moment();
+
+    const newPoll = await db.insert(poll).values({
+        token: token,
+        title: reqData.title,
+        description: reqData.desc,
+        dateUpdated: creationDate.clone().format("YYYY-MM-DD"),
+        dateStart: reqData.dateStart,
+        dateEnd: reqData.dateEnd
+    }).returning({ id: poll.id});
+
+    await db.insert(user).values({
+        pollId: newPoll[0]?.id,
+        name: reqData.name,
+        pass: pass,
+        host: true
+    }).returning({ id: user.id});
+
+    if ((reqData.opts ?? []).length > 0) {
+        await db.insert(auxInfo).values((reqData.opts).map((opt: string) => ({
+            pollId: newPoll[0]?.id,
+            code: opt,
+            type: (opt == "first-timer") ? "BOOL" : "TEXT",
+            title: opt,
+            description: ""
+        })))
+    }
+
+    const ott = Bun.SHA256.hash(Bun.env.APP_ID + moment().toISOString() + token, "hex");
+    tempToken[token + ott] = moment().add(1, "h").valueOf();
     return ctx.json({
-        message: 'Hello, ' + ctx.req.param('name') + '!',
+        ott: ott,
+        token: token
     });
 })
 
-API.put('/hello', (ctx) => {
-    return ctx.json({
-        message: "Hello, world!",
-        method: "PUT"
-    });
-});
+API.post("poll/data", async (ctx) => {
+    const reqData = await ctx.req.json();
+    let firstSetup = false;
 
-API.put('/hello/:name', async (ctx) => {
-    const token = Bun.SHA256.hash(Bun.env.APP_ID + ctx.req.param("name"), "hex");
-    const newRow = await db.insert(poll).values({
-        token: token,
-        title: ctx.req.param("name"),
-        description: "",
-        dateUpdated: moment().format("YYYY-MM-DD")
-    }).returning();
+    if ("ott" in reqData) {
+        if ((reqData.token + reqData.ott) in tempToken) {
+            firstSetup = true;
+        }
+    }
+
+    let pollData : any = await db.select({
+            id: poll.id,
+            title: poll.title,
+            description: poll.description,
+            dateStart: poll.dateStart,
+            dateEnd: poll.dateEnd
+        })
+        .from(poll)
+        .where(eq(poll.token, reqData.token))
+        .limit(1);
+
+    let userData : any = {};
+    
+    if (pollData.length > 0) {
+        pollData = pollData[0];
+
+        const users = await db.select().from(user).where(eq(user.pollId, pollData.id));
+
+        const usersAttendance = await db.select({
+                userId: user.id,
+                date: attendance.date,
+                timeslot: attendance.timeslot,
+                val: attendance.val,
+            })
+            .from(attendance)
+            .leftJoin(user, eq(user.id, attendance.id))
+            .where(inArray(user.id, users.map(e => e.id)));
+
+        for (const usr of users) {
+            userData[usr.id.toString()] = {
+                name: usr.name,
+                attendance: []
+            }
+        }
+
+        for (const att of usersAttendance) {
+            if (att.userId) {
+                if (att.userId.toString() in userData) {
+                    userData[att.userId.toString()].attendance.push({
+                        date: att.date,
+                        timeslot: att.timeslot,
+                        val: att.val
+                    })
+                }
+            }            
+        }        
+
+        delete pollData.id;
+    } else {
+        pollData = {};
+    }
 
     return ctx.json({
-        message: JSON.stringify(newRow),
-        method: "PUT"
+        firstSetup,
+        pollData,
+        userData: Object.values(userData)
     });
-});
+})
+
+setInterval(() => {
+    for (const key in tempToken) {
+        if ((tempToken[key] ?? 0) < moment().valueOf()) {
+            delete tempToken[key];
+        }
+    }
+}, 60*60*1000)
 
 export default API;

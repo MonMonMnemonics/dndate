@@ -2,12 +2,14 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 import HomePage from "./pages/Homepage";
 import Poll from "./pages/Poll";
+import CreatePoll from "./pages/CreatePoll";
 
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage/>}/>
+        <Route path="/create-poll" element={<CreatePoll/>}/>
         <Route path="/poll/:token" element={<Poll/>}/>
         <Route path="*" element={<Navigate to="/" replace/>}/>
       </Routes>
