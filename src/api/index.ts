@@ -100,43 +100,44 @@ API.post("poll/data", async (ctx) => {
 
     let userData : {[index: string]: UserData} = {};
     
-    if (pollData.length > 0) {
-        pollData = pollData[0];
-
-        const users = await db.select().from(user).where(eq(user.pollId, pollData.id));
-
-        const usersAttendance = await db.select({
-                userId: attendance.userId,
-                date: attendance.date,
-                timeslot: attendance.timeslot,
-                val: attendance.val,
-            })
-            .from(attendance)
-            .where(inArray(attendance.userId, users.map(e => e.id)));
-
-        for (const usr of users) {
-            userData[usr.id.toString()] = {
-                id: usr.id,
-                name: usr.name,
-                host: usr.host ?? false,
-                attendance: {}
-            }
-        }
-
-        for (const att of usersAttendance) {
-            if (att.userId) {
-                const userId = att.userId.toString();
-                if (userData[userId]) {
-                    const dateKey = att.date + "-" + att.timeslot.toString();
-                    userData[userId].attendance[dateKey] = att.val;
-                }
-            }            
-        }        
-
-        delete pollData.id;
-    } else {
-        pollData = {};
+    if (pollData.length < 1) {
+        ctx.status(418);
+        return ctx.text('AM A TEAPOT XD');
     }
+
+    pollData = pollData[0];
+
+    const users = await db.select().from(user).where(eq(user.pollId, pollData.id));
+
+    const usersAttendance = await db.select({
+            userId: attendance.userId,
+            date: attendance.date,
+            timeslot: attendance.timeslot,
+            val: attendance.val,
+        })
+        .from(attendance)
+        .where(inArray(attendance.userId, users.map(e => e.id)));
+
+    for (const usr of users) {
+        userData[usr.id.toString()] = {
+            id: usr.id,
+            name: usr.name,
+            host: usr.host ?? false,
+            attendance: {}
+        }
+    }
+
+    for (const att of usersAttendance) {
+        if (att.userId) {
+            const userId = att.userId.toString();
+            if (userData[userId]) {
+                const dateKey = att.date + "-" + att.timeslot.toString();
+                userData[userId].attendance[dateKey] = att.val;
+            }
+        }            
+    }        
+
+    delete pollData.id;
 
     return ctx.json({
         firstSetup,

@@ -99,8 +99,9 @@ export function CreatePoll() {
 
         if (res.status == 200) {
             const data = await res.json();
+            window.sessionStorage.setItem("OTT-" + data.token, data.ott);
             if (("ott" in data) && ("token" in data)) {
-                window.location.href = "/poll/" + data.token + "?ott=" + data.ott;
+                window.location.href = "/poll/" + data.token;
                 return;
             }
         } 
