@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { db } from "../lib/database";
 import { poll, user, auxInfo, attendance } from "../lib/schema";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import moment from "moment";
 import type { UserData } from "@/common/types";
 
@@ -16,7 +16,7 @@ API.use('/*', cors({
 API.post('poll/create', async (ctx) => {
     const reqData = await ctx.req.json();
     const token = Bun.SHA256.hash(Bun.env.APP_ID + moment().toISOString() + reqData.title, "hex");
-    const pass = await Bun.password.hash(Bun.env.APP_ID + reqData.pass);
+    const pass = Bun.SHA512.hash(Bun.env.APP_ID + reqData.pass, "hex");
     const creationDate = moment();
 
     const newPoll = await db.insert(poll).values({
@@ -33,7 +33,7 @@ API.post('poll/create', async (ctx) => {
         pollId: newPoll[0]?.id,
         name: reqData.name,
         pass: pass,
-        host: true
+        host: true,        
     }).returning({ id: user.id});
 
     if ((reqData.opts ?? []).length > 0) {
@@ -53,6 +53,28 @@ API.post('poll/create', async (ctx) => {
         token: token
     });
 })
+
+API.post("poll/login", async (ctx) => {
+    const reqData = await ctx.req.json();
+    const pass = Bun.SHA512.hash(Bun.env.APP_ID + reqData.pass, "hex");
+
+    let userData: any = await db.select()
+        .from(user)
+        .leftJoin(poll, eq(user.pollId, poll.id))
+        .where(and(
+            eq(user.id, reqData.userId),
+            eq(user.pass, pass),
+            eq(poll.token, reqData.token)
+        ))
+        .limit(1);
+
+    if (userData.length < 1) {
+        ctx.status(404)
+        return ctx.text("USER NOT FOUND");
+    }
+
+    return ctx.text('OK!');
+});
 
 API.post("poll/data", async (ctx) => {
     const reqData = await ctx.req.json();
@@ -84,20 +106,20 @@ API.post("poll/data", async (ctx) => {
         const users = await db.select().from(user).where(eq(user.pollId, pollData.id));
 
         const usersAttendance = await db.select({
-                userId: user.id,
+                userId: attendance.userId,
                 date: attendance.date,
                 timeslot: attendance.timeslot,
                 val: attendance.val,
             })
             .from(attendance)
-            .leftJoin(user, eq(user.id, attendance.id))
-            .where(inArray(user.id, users.map(e => e.id)));
+            .where(inArray(attendance.userId, users.map(e => e.id)));
 
         for (const usr of users) {
             userData[usr.id.toString()] = {
+                id: usr.id,
                 name: usr.name,
                 host: usr.host ?? false,
-                attendance: []
+                attendance: {}
             }
         }
 
@@ -105,11 +127,8 @@ API.post("poll/data", async (ctx) => {
             if (att.userId) {
                 const userId = att.userId.toString();
                 if (userData[userId]) {
-                    userData[userId].attendance.push({
-                        date: att.date,
-                        timeslot: att.timeslot,
-                        val: att.val
-                    })
+                    const dateKey = att.date + "-" + att.timeslot.toString();
+                    userData[userId].attendance[dateKey] = att.val;
                 }
             }            
         }        
@@ -122,9 +141,67 @@ API.post("poll/data", async (ctx) => {
     return ctx.json({
         firstSetup,
         pollData,
-        userData: Object.values(userData)
+        userData: Object.values(userData),
     });
-})
+});
+
+API.post("poll/save", async (ctx) => {
+    const reqData = await ctx.req.json();
+
+    let pollData: any = await db.select({
+            id: poll.id,
+            title: poll.title,
+            description: poll.description,
+            dateStart: poll.dateStart,
+            dateEnd: poll.dateEnd,
+            timezone: poll.timezone
+        })
+        .from(poll)
+        .where(eq(poll.token, reqData.token))
+        .limit(1);
+    if (pollData.length < 1) {
+        ctx.status(404)
+        return ctx.text("POLL NOT FOUND");
+    }
+
+    let userData: any = await db.select().from(user).where(eq(user.id, reqData.userData.id)).limit(1);
+    if (userData.length < 1) {
+        ctx.status(404)
+        return ctx.text("USER NOT FOUND");
+    }
+
+    if (reqData.userData.auth == "OTT") {
+        if (!((reqData.token + reqData.userData.key) in tempToken)) {
+            ctx.status(401)
+            return ctx.text("USER NOT AUTHORIZED");
+        }
+        delete tempToken[reqData.token + reqData.userData.key];
+    } else {
+        const pass = Bun.SHA512.hash(Bun.env.APP_ID + reqData.userData.key, "hex");
+        let userData: any = await db.select().from(user).where(and(eq(user.id, reqData.userData.id), eq(user.pass, pass))).limit(1);
+        if (userData.length < 1) {
+            ctx.status(401);
+            return ctx.text("USER NOT AUTHORIZED");
+        }
+    }
+
+    let newAttData: {userId: number, date: string, timeslot:number, val: boolean}[] = [];
+    for (const dateKey in (reqData.attData ?? {})) {
+        newAttData.push({
+            userId: reqData.userData.id,
+            date: dateKey.slice(0, 10),
+            timeslot: Number(dateKey.slice(11)),
+            val: reqData.attData[dateKey]
+        });
+    }
+    
+    await db.delete(attendance).where(eq(attendance.userId, reqData.userData.id ?? -1));
+    if (newAttData.length > 0) {
+        await db.insert(attendance).values(newAttData);
+    }
+
+    return ctx.text("SAVED!");
+});
 
 setInterval(() => {
     for (const key in tempToken) {

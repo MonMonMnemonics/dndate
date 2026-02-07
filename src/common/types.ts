@@ -1,9 +1,6 @@
 export interface UserData {
+    id: number,
     name: string,
     host: boolean,
-    attendance: {
-        date: string,
-        timeslot: number,
-        val: boolean
-    }[]
+    attendance: {[index: string]: boolean}
 }

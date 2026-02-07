@@ -1,10 +1,10 @@
 import moment from "moment";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import type { UserData } from "@/common/types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faHouse, faPenToSquare, faPlus, faTrash, faUser } from "@fortawesome/free-solid-svg-icons";
+import { faFloppyDisk, faHouse, faPenToSquare, faPlus, faSpinner, faTrash, faUser } from "@fortawesome/free-solid-svg-icons";
 
 export function Poll() {
     const { token } = useParams();
@@ -20,7 +20,6 @@ export function Poll() {
     const [ dates, setDates ] = useState<string[]>([]);
 
     const [ userData, setUserData ] = useState<UserData[]>([]);
-    const [ firstSetup, setFirstSetup ] = useState(false);
 
     useEffect(() => {
         getPollData();
@@ -62,13 +61,221 @@ export function Poll() {
 
         const data = await res.json();
         setPollData({...pollData, ...data.pollData});
-        setFirstSetup(data.firstSetup);
         setUserData(data.userData);
+
+        if ((data.firstSetup ?? false) == true) {
+            for (const usr of (data.userData ?? [])) {
+                if (usr.host == true) {
+                    setSelectedUser({
+                        id: usr.id,
+                        host: false,
+                        auth: "OTT",
+                        key: searchParams.get("ott") ?? ""
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
+    //-------------------------- TABLE EDIT CONTROL --------------------------
+    const [ selectedUser, setSelectedUser] = useState({
+        id: -1,
+        host: false,
+        auth: "OTT",
+        key: ""
+    });
+
+    const [ brushType, setBrushType ] = useState(1);
+    const [ brushActive, setBrushActive ] = useState(false);
+    const [ loading, setLoading ] = useState(false);
+    const [ failCheck, setFailCheck ] = useState(0);
+
+    function switchCellColour(date: string, timeslotIdx: number) {
+        if (selectedUser.id != -1) {
+            setUserData(userData.map(usr => {
+                if (usr.id === selectedUser.id) {
+                    const dateKey = date + "-" + timeslotIdx.toString();
+                    if (brushType == -1) {
+                        usr.attendance[dateKey] = false;
+                    } else if (brushType == 0) {
+                        delete usr.attendance[dateKey];
+                    } else if (brushType == 1) {
+                        usr.attendance[dateKey] = true;
+                    }
+                }
+                return (usr);
+            }));
+        }
+    }
+
+    function mouseDown(date: string, timeslotIdx: number) {
+        setBrushActive(true);
+        switchCellColour(date, timeslotIdx);
+    }
+
+    function mouseEnter(date: string, timeslotIdx: number) {
+        if (brushActive) {
+            switchCellColour(date, timeslotIdx);
+        }
+    }
+
+    function mouseLeave() {
+        setBrushActive(false);
+    }
+
+    async function login(userName: string, userId: number) {
+        const swConf = await Swal.fire({
+            title: "Login",
+            input: "password",
+            inputPlaceholder: "password...",
+            inputLabel: "Password",
+            inputAttributes: {
+                autocapitalize: "off",
+                autocorrect: "off"
+            },
+            text: "Login password for username " + userName,
+            showCancelButton: true,
+            focusConfirm: false,
+            reverseButtons: true,
+            confirmButtonText: "Login",
+            cancelButtonText: "Cancel",
+            inputValidator: (val) => {
+                if (!val) {
+                    return "Please fill in password";
+                }
+            }
+        })
+
+        if (!swConf.isConfirmed) {
+            return;
+        }
+
+        if (failCheck >= 3) {
+            Swal.fire({
+                title: "Login fail",
+                icon: "error",
+                text: "Make sure you choose the right user and enter the right password"
+            });
+        }
+
+        setLoading(true);
+        const res = await fetch("/api/poll/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                token: token,
+                userId: userId,
+                pass: swConf.value,
+            })
+        });
+        setLoading(false);
+
+        if (res.status !== 200) {
+            
+            setFailCheck(failCheck + 1);
+
+            if (failCheck > 2) {
+                setTimeout(() => {
+                    setFailCheck(0);
+                }, 30*1000);
+            }
+            
+            Swal.fire({
+                title: "Login fail",
+                icon: "error",
+                text: "Make sure you choose the right user and enter the right password"
+            });
+            return;
+        }
+
+        const userDt = userData.find(e => e.id === userId);
+        setSelectedUser({
+            id: userId,
+            host: userDt?.host ?? false,
+            auth: "PASS",
+            key: swConf.value
+        });
+    }
+
+    async function save() {
+        if (selectedUser.id < 0) {
+            return;
+        }
+
+        const swConf = await Swal.fire({
+            title: "Save changes?",
+            icon: "question",
+            showCancelButton: true,
+            focusConfirm: false,
+            reverseButtons: true,
+            confirmButtonText: "Yes",
+            cancelButtonText: "No"
+        })
+        
+        if (!swConf.isConfirmed) {
+            return;
+        }
+
+        const userDt = userData.find(usr => usr.id === selectedUser.id);
+        if (userDt) {
+            setLoading(true);
+            const res = await fetch("/api/poll/save", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    token: token,
+                    userData: selectedUser,
+                    attData: userDt.attendance,
+                })
+            })            
+
+            if (res.status !== 200) {
+                setLoading(false);
+                Swal.fire({
+                    title: "Server Error",
+                    icon: "error",
+                    text: "sorry for the inconvenience, please let admin know."
+                });
+                return;
+            }
+    
+            await getPollData();
+            setLoading(false);
+        } 
+
+        Swal.fire({
+            title: "Data Saved!",
+            icon: "success",
+        });
+
+        setSelectedUser({
+            ...selectedUser,
+            id: -1,
+            host: false
+        });
     }
 
     return (
         <div className="flex flex-col w-screen h-screen p-3 gap-3">
-            <div className="bg-dark-secondary rounded-lg p-3 border border-gray-500 text-dark-text flex flex-col gap-2 h-[30%]">
+            { loading && 
+                <div className="fixed h-full w-full z-10 flex flex-row">
+                    <div className="bg-black opacity-40 fixed h-full w-full z-11"></div>
+                    <div className="mx-auto flex flex-col">
+                        <div className="my-auto rounded-lg p-8 border border-black bg-dark-secondary z-12 flex flex-col font-bold text-3xl gap-5">
+                            <div className="w-full flex flex-row justify-center">
+                                <FontAwesomeIcon className="text-[10em] animate-spin" icon={faSpinner} />
+                            </div>
+                            <div className="w-full text-center">LOADING...</div>
+                        </div>
+                    </div>
+                </div>
+            }
+            <div className="bg-dark-secondary rounded-lg p-3 border border-gray-500 text-dark-text flex flex-col gap-2 h-[40%]">
                 <div className="flex flex-row">
                     <button className="dark-button p-1 text-2xl rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center"
                         onClick={() => {window.location.href = "/"}} type="button"
@@ -81,29 +288,51 @@ export function Poll() {
                             {pollData.title}
                         </div>
                     </div>
+                    {
+                        (selectedUser.id !== -1) ?
+                            <button className="bg-green-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center text-2xl"
+                                onClick={save} type="button"
+                            >
+                                <FontAwesomeIcon icon={faFloppyDisk} />
+                                <div className="font-bold">Save</div>
+                            </button>
+                        : null
+                    }
                 </div>
                 <hr className="h-px my-2 bg-white border-0"/>
                 <div className="grow flex flex-row gap-2">
                     <div className="h-full w-[20em] flex flex-col gap-2">
-                        <div className="flex flex-row justify-between items-center">
-                            <div className="font-bold text-xl">Members</div>
-                            <button className="bg-green-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center"
-                                onClick={() => {}} type="button"
-                            >
-                                <div className="font-bold">Let me join!</div>
-                                <FontAwesomeIcon icon={faPlus} />
-                            </button>
+                        <div className="flex flex-row items-center">
+                            <div className="font-bold text-xl me-auto">Members</div>
+                            {
+                                (selectedUser.id == -1) ?
+                                <button className="bg-green-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center"
+                                    onClick={() => {}} type="button"
+                                >
+                                    <div className="font-bold">Let me join!</div>
+                                    <FontAwesomeIcon icon={faPlus} />
+                                </button>
+                                : null
+                            }
                         </div>
                         <div className="grow relative flex flex-col">
                             <div className="h-full w-full absolute gap-2 overflow-y-auto px-2">
                                 <ul className="list-none font-bold">
                                     {
                                         userData.map((user, idx) => (
-                                            <li key={'user-list-' + idx}><div className="flex flex-row gap-2 items-center">
+                                            <li key={'user-list-' + idx}><div className={"flex flex-row gap-2 items-center p-2 rounded border " + ((user.id === selectedUser.id) ? "bg-gray-700 border-green-500" : "border-gray-500")}>
                                                 <FontAwesomeIcon icon={faUser}/>
                                                 <div className="w-full">{user.name + (user.host ? " (host)" : "")} </div>
-                                                <FontAwesomeIcon className="cursor-pointer" icon={faPenToSquare}/>
-                                                <FontAwesomeIcon className="cursor-pointer text-red-500" icon={faTrash}/>
+                                                {
+                                                    (selectedUser.id == -1) ?
+                                                    <Fragment>
+                                                        <FontAwesomeIcon className="cursor-pointer" icon={faPenToSquare} onClick={() => login(user.name, user.id)}/>
+                                                        {
+                                                            (user.host) ? null : <FontAwesomeIcon className="cursor-pointer text-red-500" icon={faTrash}/>
+                                                        }
+                                                    </Fragment>
+                                                    : null
+                                                }
                                             </div></li>
                                         ))
                                     }
@@ -121,10 +350,31 @@ export function Poll() {
                         />
                         <div className="flex flex-row justify-between items-center font-bold text-xl">
                             <div>Timezone: {pollData.timezone}</div>
-                            <div className="flex flex-row items-center gap-2">
-                                <div>Preferred</div>
-                                <div>Open</div>
-                                <div>No</div>
+                            <div className="flex flex-col gap-2">
+                                <div className="flex flex-row items-center gap-6">
+                                    <div className="flex flex-row items-center gap-2 select-none cursor-pointer" onClick={() => setBrushType(1)}>
+                                        <input type="radio" checked={brushType == 1} readOnly/>
+                                        <div>Preferred</div>
+                                        <div className="bg-white w-[2ch] h-[2ch] rounded-lg p-3 preferred"/>
+                                    </div>
+                                    <div className="flex flex-row items-center gap-2 select-none cursor-pointer" onClick={() => setBrushType(0)}>
+                                        <input type="radio" checked={brushType == 0} readOnly/>
+                                        <div>Open</div>
+                                        <div className="bg-white w-[2ch] h-[2ch] rounded-lg p-3 open"/>
+                                    </div>
+                                    <div className="flex flex-row items-center gap-2 select-none cursor-pointer" onClick={() => setBrushType(-1)}>
+                                        <input type="radio" checked={brushType == -1} readOnly/>
+                                        <div>No</div>
+                                        <div className="bg-white w-[2ch] h-[2ch] rounded-lg p-3 closed"/>
+                                    </div>
+                                </div>
+                                {
+                                    (selectedUser.id != -1) ?
+                                        <div className="text-sm">
+                                            *Click and drag below to fill your timeslot
+                                        </div>
+                                    : null
+                                }
                             </div>
                         </div>
                     </div>
@@ -132,8 +382,8 @@ export function Poll() {
             </div>
             <div className="bg-dark-secondary rounded-lg p-3 border border-gray-500 text-dark-text flex flex-col gap-2 grow">
                 <div className='relative grow select-none flex flex-col'>
-                    <div className="h-full w-full absolute overflow-auto p-2">
-                        <table className='poll table-auto' style={{ width: 'auto' }}>
+                    <div className="h-full w-full absolute overflow-auto m-2">
+                        <table className='poll' style={{ width: 'auto' }}>
                             <thead className="sticky top-0">
                                 <tr>
                                     <th rowSpan={2} className='sticky left-0 align-middle text-center' style={{ zIndex: 2 }}>Name</th>
@@ -143,27 +393,45 @@ export function Poll() {
                                 </tr>
                                 <tr>
                                     { dates.map((date) => {
-                                        return Array.from(Array(24*2).keys()).map((timeslotIdx) => (
-                                            <th key={date + "-" + timeslotIdx}>{((timeslotIdx % 2) == 0) ? timeslotIdx/2 : ""}</th>
+                                        return Array.from(Array(24).keys()).map((timeslotIdx) => (
+                                            <th key={date + "-" + timeslotIdx} className={"timeslot min-w-[6ch] ps-2 text-start " + (((timeslotIdx % 2) == 0) ? "even" : "odd")} colSpan={2}>
+                                                {timeslotIdx}
+                                            </th>
                                         ))
                                     })}
                                 </tr>
                             </thead>
                             <tbody>
                                 {userData.map((user, idx) => (
-                                    <tr key={'tr-' + idx} style={{ height: '3em' }}>
-                                        <th className='sticky text-nowrap left-0 align-middle px-3' style={{ zIndex: 1 }}>
+                                    <tr key={'tr-' + idx} style={{ height: '3em' }} onMouseLeave={mouseLeave}>
+                                        <th className='sticky text-nowrap left-0 align-middle px-3 min-w-[20ch]' style={{ zIndex: 1 }}>
                                             <div className='flex flex-row items-center gap-3 w-full'>
                                                 <div>{user.name}</div>
                                             </div>
                                         </th>
-                                        {/*dates.map((date) => {
+                                        {dates.map((date) => {
                                             return Array.from(Array(24*2).keys()).map((idx2) => {
-                                                return (
-                                                    <td key={idx + "-" + date + '-' + idx2} className='bg-light'></td>
-                                                );
+                                                const dateKey = date + "-" + idx2.toString();
+                                                if (dateKey in user.attendance) {
+                                                    if (user.attendance[dateKey]) {
+                                                        return <td 
+                                                            key={idx + "-" + date + '-' + idx2} className='preferred' onMouseUp={mouseLeave}
+                                                            onMouseDown={() => mouseDown(date, idx2)} onMouseEnter={() => mouseEnter(date, idx2)}
+                                                        ></td>;
+                                                    } else {
+                                                        return <td 
+                                                            key={idx + "-" + date + '-' + idx2} className='closed' onMouseUp={mouseLeave}
+                                                            onMouseDown={() => mouseDown(date, idx2)} onMouseEnter={() => mouseEnter(date, idx2)}
+                                                        ></td>;
+                                                    }
+                                                } else {
+                                                    return <td 
+                                                        key={idx + "-" + date + '-' + idx2} className='open' onMouseUp={mouseLeave}
+                                                        onMouseDown={() => mouseDown(date, idx2)} onMouseEnter={() => mouseEnter(date, idx2)}
+                                                    ></td>;
+                                                }
                                             })
-                                        })*/}
+                                        })}
                                     </tr>
                                 ))}
                             </tbody>

@@ -7,6 +7,10 @@
   --color-dark-text: #e0e0e0;
 }
 
+button {
+  cursor: pointer;
+}
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -71,6 +75,22 @@
 
 table.poll {
   th {
-    padding: 2px;
+    background-color: #1a1a1a;
   }
+
+  td {
+    cursor: pointer;
+  }
+}
+
+.preferred {
+  background-color: #0EAB77;
+}
+
+.open {
+  background-color: #195FB4;
+}
+
+.closed {
+  background-color:  #7C8491;
 }
