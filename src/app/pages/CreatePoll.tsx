@@ -3,12 +3,13 @@ import { faArrowCircleLeft, faSpinner, faWandSparkles } from "@fortawesome/free-
 import { useState } from "react";
 import moment from "moment";
 import Swal from 'sweetalert2';
+import { auxInfoEnum } from "@/common/consts";
 
 const extraOpts: {[index: string]: any} = {
-    "first-timer": { text:"If first-timer player", codes: ["first-timer"]},
-    "help-char-create": { text:"If player needs guidance creating their char", codes: ["help-char-create"]},
-    "discord-handle": { text:"Discord handle username", codes: ["discord-handle"]},
-    "veils-lines": { text:"Veils (Uncomfortable subjects) and Lines (PTSD-inducing subjects)" , codes: ["veils", "lines"]},
+    "first-timer": { text:"If first-timer player", codes: [auxInfoEnum.firstTimer]},
+    "help-char-create": { text:"If player needs guidance creating their char", codes: [auxInfoEnum.helpCharCreate]},
+    "discord-handle": { text:"Discord handle username", codes: [auxInfoEnum.discordHandle]},
+    "veils-lines": { text:"Veils (Uncomfortable subjects) and Lines (PTSD-inducing subjects)" , codes: [auxInfoEnum.veils, auxInfoEnum.lines]},
 };
 
 const timezones: string[] = [
@@ -228,7 +229,7 @@ export function CreatePoll() {
                         <ul className="list-none">
                             {Object.entries(extraOpts).map(([key, opt]) => (
                                 <li className="flex flex-row gap-2 items-center" key={"opts-" + key}>
-                                    <input className="w-[1.1em] h-[1.1em]" type="checkbox" checked={optsInfo.includes(key)}
+                                    <input className="w-[1.1em] h-[1.1em] cursor-pointer" type="checkbox" checked={optsInfo.includes(key)}
                                         onChange={() => {
                                             const idx = optsInfo.indexOf(key);
                                             if (idx == -1) {

@@ -6,6 +6,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import moment from "moment";
 import type { UserData } from "@/common/types";
 import { createMiddleware } from "hono/factory";
+import { auxInfoEnum } from "@/common/consts";
 
 const API = new Hono<{
     Variables: {
@@ -118,7 +119,7 @@ API.post('poll/create', async (ctx) => {
         await db.insert(auxInfo).values((reqData.opts).map((opt: string) => ({
             pollId: newPoll[0]?.id,
             code: opt,
-            type: (opt == "first-timer") ? "BOOL" : "TEXT",
+            type: (opt == auxInfoEnum.firstTimer) ? "BOOL" : "TEXT",
             title: opt,
             description: ""
         })))
@@ -213,9 +214,36 @@ API.post("poll/data", async (ctx) => {
 
     pollData = pollData[0];
 
+    pollData.auxInfo = await db.select({
+            id: auxInfo.id,
+            code: auxInfo.code
+        })
+        .from(auxInfo)
+        .where(eq(auxInfo.pollId, pollData.id));
+
+    const sortedAuxInfo = Object.values(auxInfoEnum);
+    pollData.auxInfo = pollData.auxInfo.sort((a: any, b: any) => {
+        return sortedAuxInfo.indexOf(a.code) - sortedAuxInfo.indexOf(b.code);
+    })
+    
+    let auxInfoMap : {[index: string]: string} = {};
+    for (const infoDt of pollData.auxInfo) {
+        auxInfoMap[infoDt.id.toString()] = infoDt.code;
+    }
+    
+
     const users = await db.select()
         .from(user)
         .where(eq(user.pollId, pollData.id));
+    for (const usr of users) {
+        userData[usr.id.toString()] = {
+            id: usr.id,
+            name: usr.name,
+            host: usr.host ?? false,
+            attendance: {},
+            auxInfo: {}
+        };
+    }
 
     const usersAttendance = await db.select({
             userId: attendance.userId,
@@ -225,16 +253,6 @@ API.post("poll/data", async (ctx) => {
         })
         .from(attendance)
         .where(inArray(attendance.userId, users.map(e => e.id)));
-
-    for (const usr of users) {
-        userData[usr.id.toString()] = {
-            id: usr.id,
-            name: usr.name,
-            host: usr.host ?? false,
-            attendance: {}
-        };
-    }
-
     for (const att of usersAttendance) {
         if (att.userId) {
             const userId = att.userId.toString();
@@ -243,7 +261,50 @@ API.post("poll/data", async (ctx) => {
                 userData[userId].attendance[dateKey] = att.val;
             }
         }            
-    }        
+    }
+
+    const auxInfos = await db.select({
+            infoId: userInfo.infoId,
+            userId: userInfo.id,
+            val: userInfo.val
+        })
+        .from(userInfo)
+        .where(and(
+            inArray(userInfo.userId, users.map(e => e.id)),
+            inArray(userInfo.infoId, pollData.auxInfo.map((e: any) => e.id))
+        ))
+    for (const auxDt of auxInfos) {
+        if ((auxDt.infoId) && (auxDt.userId)) {
+            const userId = auxDt.userId.toString();
+            const infoId = auxDt.infoId.toString();
+            if ((userData[userId]) && (auxInfoMap[infoId])) {
+                switch (auxInfoMap[infoId]) {
+                    case (auxInfoEnum.firstTimer): {
+                        if (auxDt.val?.toUpperCase() == "TRUE") {
+                            userData[userId].auxInfo[auxInfoMap[infoId]] = true;
+                        } else if (auxDt.val?.toUpperCase() == "FALSE") { 
+                            userData[userId].auxInfo[auxInfoMap[infoId]] = false;
+                        }
+                        break;
+                    }
+
+                    case (auxInfoEnum.helpCharCreate): {
+                        if (auxDt.val?.toUpperCase() == "TRUE") {
+                            userData[userId].auxInfo[auxInfoMap[infoId]] = true;
+                        } else if (auxDt.val?.toUpperCase() == "FALSE") { 
+                            userData[userId].auxInfo[auxInfoMap[infoId]] = false;
+                        }
+                        break;
+                    }
+                
+                    default: {
+                        userData[userId].auxInfo[auxInfoMap[infoId]] = auxDt.val;
+                        break;
+                    }                        
+                }
+            }
+        }
+    }
 
     delete pollData.id;
 
@@ -268,6 +329,9 @@ API.use("poll/save", async (ctx, next) => checkAuth(ctx, next));
 API.post("poll/save", async (ctx) => {
     const reqData = await ctx.req.json();
 
+    let userData: any = await db.select().from(user).where(eq(user.id, reqData.userData.id)).limit(1);
+    userData = userData[0];
+
     let newAttData: {userId: number, date: string, timeslot:number, val: boolean}[] = [];
     for (const dateKey in (reqData.attData ?? {})) {
         newAttData.push({
@@ -281,6 +345,60 @@ API.post("poll/save", async (ctx) => {
     await db.delete(attendance).where(eq(attendance.userId, reqData.userData.id ?? -1));
     if (newAttData.length > 0) {
         await db.insert(attendance).values(newAttData);
+    }
+
+    const infoMapData = await db.select({ id:auxInfo.id, code:auxInfo.code }).from(auxInfo).where(eq(auxInfo.pollId, userData.pollId));
+    let infoMap : {[index:string]: number} = {};
+    for (const dt of infoMapData) {
+        if (dt.code) {
+            infoMap[dt.code] = dt.id;
+        }        
+    }
+
+    await db.delete(userInfo).where(eq(userInfo.userId, reqData.userData.id ?? -1));
+    let newInfoData: {userId: number, infoId: number, val:string}[] = [];
+    for (const code in (reqData.userData.auxInfo ?? {})) {
+        if (code in infoMapData) {
+            let val:any = null;
+
+            switch (code) {
+                case (auxInfoEnum.firstTimer): {
+                    if (reqData.userData.auxInfo[code] === true) {
+                        val = "TRUE";
+                    } else {
+                        val = "FALSE";
+                    }
+                    break;
+                }
+
+                case (auxInfoEnum.helpCharCreate): {
+                    if (reqData.userData.auxInfo[code] === true) {
+                        val = "TRUE";
+                    } else {
+                        val = "FALSE";
+                    }
+                    break;
+                }
+
+                default: {
+                    val = reqData.userData.auxInfo[code];
+                    break;
+                }
+            }
+
+            if (val) {
+                newInfoData.push({
+                    userId: reqData.userData.id,
+                    //@ts-expect-error
+                    infoId: infoMapData[code],
+                    val: val
+                });
+            }
+        }
+
+        if (newInfoData.length > 0) {
+            await db.insert(userInfo).values(newInfoData);
+        }
     }
 
     return ctx.text("SAVED!");
