@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import type { UserData } from "@/common/types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFloppyDisk, faHatWizard, faHouse, faPenToSquare, faPlus, faQuestionCircle, faSpinner, faTrash, faUser, faUserPlus } from "@fortawesome/free-solid-svg-icons";
+import { faBan, faFloppyDisk, faHatWizard, faHouse, faLockOpen, faPenToSquare, faPlus, faQuestionCircle, faSpinner, faTrash, faUser, faUserPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
 
 export function Poll() {
     const { token } = useParams();
@@ -15,7 +15,8 @@ export function Poll() {
         description: "",
         dateStart: moment().format("YYYY-MM-DD"),
         dateEnd: moment().format("YYYY-MM-DD"),
-        timezone: "GMT +00:00"
+        timezone: "GMT +00:00",
+        open: true
     })
     const [ dates, setDates ] = useState<string[]>([]);
     const [ userData, setUserData ] = useState<UserData[]>([]);
@@ -38,7 +39,7 @@ export function Poll() {
         
     }, [pollData.dateStart, pollData.dateEnd])
 
-    async function getPollData(userId: number | null) {
+    async function getPollData(userId: number | null = null) {
         const res = await fetch("/api/poll/data", {
             method: "POST",
             headers: {
@@ -91,6 +92,208 @@ export function Poll() {
                 });
             }
         }
+    }
+
+    async function withdrawApplication() {
+        const swConf = await Swal.fire({
+            title: "Withdraw?",
+            theme: 'dark',
+            icon: "warning",
+            text: "Are you sure you want to withdraw your answer?",
+            showCancelButton: true,
+            focusConfirm: false,
+            reverseButtons: true,
+            cancelButtonText: "No",
+            cancelButtonColor: "#3085d6",
+            confirmButtonText: "Yes",
+            confirmButtonColor: "#d33"
+        })
+
+        if (!swConf.isConfirmed) {
+            return;
+        }
+
+        setLoading(true);
+        const res = await fetch("/api/poll/withdraw", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                token: token,
+                userData: selectedUser,
+            })
+        });
+
+        if (res.status !== 200) {
+            setLoading(false);
+            Swal.fire({
+                title: "Server Error",
+                theme: 'dark',
+                icon: "error",
+                text: "sorry for the inconvenience, please let admin know."
+            });
+            return;
+        }
+
+        await getPollData();
+        setLoading(false);
+        
+        setSelectedUser({
+            ...selectedUser,
+            id: -1,
+            host: false
+        });
+    }
+
+    async function cancelPoll() {
+        const swConf = await Swal.fire({
+            title: "Delete poll?",
+            theme: 'dark',
+            icon: "warning",
+            text: "Are you sure you want to delete this poll?",
+            showCancelButton: true,
+            focusConfirm: false,
+            reverseButtons: true,
+            cancelButtonText: "No",
+            cancelButtonColor: "#3085d6",
+            confirmButtonText: "Yes",
+            confirmButtonColor: "#d33"
+        })
+
+        if (!swConf.isConfirmed) {
+            return;
+        }
+
+        setLoading(true);
+        const res = await fetch("/api/poll/delete", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                token: token,
+                userData: selectedUser,
+            })
+        });
+
+        if (res.status !== 200) {
+            setLoading(false);
+            Swal.fire({
+                title: "Server Error",
+                theme: 'dark',
+                icon: "error",
+                text: "sorry for the inconvenience, please let admin know."
+            });
+            return;
+        }
+
+        await getPollData();
+        setLoading(false);
+        
+        setSelectedUser({
+            ...selectedUser,
+            id: -1,
+            host: false
+        });
+    }
+
+    async function switchClosePoll() {
+        const swConf = await Swal.fire({
+            title: pollData.open ? "Close poll?" : "Reopen Poll?",
+            theme: 'dark',
+            icon: "warning",
+            text: pollData.open ? "Are you sure you want to close this poll?" : "Are you sure you want to reopen this poll?",
+            showCancelButton: true,
+            focusConfirm: false,
+            reverseButtons: true,
+            cancelButtonText: "No",
+            confirmButtonText: "Yes",
+        })
+
+        if (!swConf.isConfirmed) {
+            return;
+        }
+
+        setLoading(true);
+        const res = await fetch("/api/poll/set-open", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                token: token,
+                userData: selectedUser,
+                open: !pollData.open
+            })
+        });
+
+        if (res.status !== 200) {
+            setLoading(false);
+            Swal.fire({
+                title: "Server Error",
+                theme: 'dark',
+                icon: "error",
+                text: "sorry for the inconvenience, please let admin know."
+            });
+            return;
+        }
+
+        await getPollData();
+        setLoading(false);
+        
+        setSelectedUser({
+            ...selectedUser,
+            id: -1,
+            host: false
+        });
+    }
+
+    async function deleteUser(userName: string, userId: number) {
+        const swConf = await Swal.fire({
+            title: "Delete member?",
+            theme: 'dark',
+            icon: "warning",
+            text: "Are you sure you want to delete member " + userName + " ?",
+            showCancelButton: true,
+            focusConfirm: false,
+            reverseButtons: true,
+            cancelButtonText: "No",
+            cancelButtonColor: "#3085d6",
+            confirmButtonText: "Yes",
+            confirmButtonColor: "#d33"
+        })
+
+        if (!swConf.isConfirmed) {
+            return;
+        }
+
+        setLoading(true);
+        const res = await fetch("/api/poll/delete-user", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                token: token,
+                userData: selectedUser,
+                userId: userId
+            })
+        });
+
+        if (res.status !== 200) {
+            setLoading(false);
+            Swal.fire({
+                title: "Server Error",
+                theme: 'dark',
+                icon: "error",
+                text: "sorry for the inconvenience, please let admin know."
+            });
+            return;
+        }
+
+        await getPollData();
+        setLoading(false);
     }
 
     //-------------------------- TABLE EDIT CONTROL --------------------------
@@ -185,7 +388,7 @@ export function Poll() {
 
         if (failCheck >= 3) {
             Swal.fire({
-                title: "Login fail",
+                title: "Login failed",
                 theme: 'dark',
                 icon: "error",
                 text: "Make sure you choose the right user and enter the right password"
@@ -430,7 +633,7 @@ export function Poll() {
                                     }} type="submit"
                                 >
                                     <FontAwesomeIcon icon={faUserPlus} />
-                                    <div className="font-bold">Submit</div>
+                                    <div className="font-bold">Join the group!</div>
                                 </button>
                             </div>
                         </div>
@@ -450,6 +653,13 @@ export function Poll() {
                             {pollData.title}
                         </div>
                     </div>
+                    {
+                        (!pollData.open) ?
+                            <div className="text-red-500 text-3xl font-bold border border-2 border-red-500 py-1 px-2 rounded">
+                                POLL CLOSED
+                            </div>
+                        : null
+                    }
                 </div>
                 <hr className="h-px my-2 bg-white border-0"/>
                 <div className="grow flex flex-row gap-2">
@@ -457,7 +667,7 @@ export function Poll() {
                         <div className="flex flex-row items-center">
                             <div className="font-bold text-xl me-auto">Members</div>
                             {
-                                (selectedUser.id == -1) ?
+                                ((selectedUser.id == -1) && (pollData.open)) ?
                                 <button className="bg-green-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center"
                                     onClick={() => setNewModal({
                                         show: true,
@@ -465,7 +675,7 @@ export function Poll() {
                                         pass: ""
                                     })} type="button"
                                 >
-                                    <div className="font-bold">Let me join!</div>
+                                    <div className="font-bold">Join!</div>
                                     <FontAwesomeIcon icon={faPlus} />
                                 </button>
                                 : null
@@ -478,7 +688,7 @@ export function Poll() {
                                         userData.map((user, idx) => (
                                             <li key={'user-list-' + idx}><div className={"flex flex-row gap-2 items-center p-2 rounded border " + ((user.id === selectedUser.id) ? "bg-gray-700 border-green-500" : "border-gray-500")}>
                                                 <FontAwesomeIcon icon={faUser}/>
-                                                <div className="w-full">{user.name + (user.host ? " (host)" : "")} </div>
+                                                <div className="w-full">{user.name + (user.host ? " (GM)" : "")} </div>
                                             </div></li>
                                         ))
                                     }
@@ -503,7 +713,7 @@ export function Poll() {
                         <hr className="h-px bg-gray-600 border-0"/>
                         <div className="grow px-3 font-bold text-sm">
                             <ul className="list-disc">
-                                <li>Just click let me join to add your name.</li>
+                                <li>Just click "Join" to add your data.</li>
                                 <li>Click pencil symbol next to your name in the table to edit your answer.</li>
                                 <li>Editing as the host allows you to see extra information submitted.</li>
                             </ul>
@@ -516,12 +726,39 @@ export function Poll() {
                     <div>Timezone: {pollData.timezone}</div>
                     {
                         (selectedUser.id !== -1) ?
-                            <button className="bg-green-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center text-2xl"
-                                onClick={save} type="button"
-                            >
-                                <FontAwesomeIcon icon={faFloppyDisk} />
-                                <div className="font-bold">Save</div>
-                            </button>
+                            <div className="flex flex-row items-center gap-2">
+                                <button className="bg-green-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center text-xl"
+                                    onClick={save} type="button"
+                                >
+                                    <FontAwesomeIcon icon={faFloppyDisk} />
+                                    <div className="font-bold">Save</div>
+                                </button>
+                                {
+                                    (!selectedUser.host) ?
+                                        <button className="bg-red-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center text-xl"
+                                            onClick={withdrawApplication} type="button"
+                                        >
+                                            <FontAwesomeIcon icon={faXmark} />
+                                            <div className="font-bold">Withdraw</div>
+                                        </button>
+                                    :
+                                    <Fragment>
+                                        <button className="bg-blue-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center text-xl"
+                                            onClick={switchClosePoll} type="button"
+                                        >
+                                            <FontAwesomeIcon icon={ pollData.open ? faBan : faLockOpen }/>
+                                            <div className="font-bold">{ pollData.open ? "Close Poll" : "Reopen Poll" }</div>
+                                        </button>
+                                        <button className="bg-red-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center text-xl"
+                                            onClick={cancelPoll} type="button"
+                                        >
+                                            <FontAwesomeIcon icon={faXmark} />
+                                            <div className="font-bold">Delete Poll</div>
+                                        </button>
+                                    </Fragment>
+                                }
+                                
+                            </div>                            
                         : null
                     }
                     <div className="flex flex-col gap-2">
@@ -571,20 +808,25 @@ export function Poll() {
                             <tbody>
                                 {userData.map((user, idx) => (
                                     <tr key={'tr-' + idx} style={{ height: '3em' }} onMouseLeave={mouseLeave}>
-                                        <th className='sticky text-nowrap left-0 align-middle px-3 min-w-[20ch]' style={{ zIndex: 1 }}>
+                                        <th className='sticky text-nowrap left-0 align-middle px-3 min-w-[30ch]' style={{ zIndex: 1 }}>
                                             <div className='flex flex-row items-center gap-3 w-full'>
+                                                <div className="me-auto">{user.name}</div>
                                                 {
                                                     (user.host == true) ?
-                                                    <Fragment>
+                                                    <div className='flex flex-row items-center gap-1'>
+                                                        <div>GM</div>
                                                         <FontAwesomeIcon icon={faHatWizard}/>
-                                                    </Fragment>
+                                                    </div>
                                                     : null
                                                 }
-                                                <div className="me-auto">{user.name}</div>
                                                 {
                                                     (selectedUser.id == -1) ?
                                                     <Fragment>
                                                         <FontAwesomeIcon className="cursor-pointer" icon={faPenToSquare} onClick={() => login(user.name, user.id)}/>
+                                                    </Fragment>
+                                                    : ((selectedUser.host) && (user.id !== selectedUser.id)) ?
+                                                    <Fragment>
+                                                        <FontAwesomeIcon className="cursor-pointer text-red-500" icon={faTrash} onClick={() => deleteUser(user.name, user.id)}/>
                                                     </Fragment>
                                                     : null
                                                 }

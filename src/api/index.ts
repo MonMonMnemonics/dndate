@@ -1,14 +1,92 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { db } from "../lib/database";
-import { poll, user, auxInfo, attendance } from "../lib/schema";
+import { poll, user, auxInfo, attendance, userInfo } from "../lib/schema";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import moment from "moment";
 import type { UserData } from "@/common/types";
+import { createMiddleware } from "hono/factory";
 
-const API = new Hono();
+const API = new Hono<{
+    Variables: {
+        pollData: AuthPollData,
+        userData: AuthUserData
+    },
+}>();
 const tempToken: {[key: string]: number} = {};
 
+//-------------------------- MIDDLEWARE --------------------------
+type AuthPollData = {
+    id: number,
+    title: string,
+    description: string,
+    dateStart: string,
+    dateEnd: string,
+    timezone: string,
+    open: boolean
+};
+
+type AuthUserData = {
+    id: number,
+    name: string,
+    host: boolean
+};
+
+const checkAuth = createMiddleware(async (ctx, next) => {
+    const reqData = await ctx.req.json();
+
+    let pollData: any = await db.select({
+            id: poll.id,
+            title: poll.title,
+            description: poll.description,
+            dateStart: poll.dateStart,
+            dateEnd: poll.dateEnd,
+            timezone: poll.timezone,
+            open: poll.open
+        })
+        .from(poll)
+        .where(eq(poll.token, reqData.token))
+        .limit(1);
+    if (pollData.length < 1) {
+        ctx.status(404)
+        return ctx.text("POLL NOT FOUND");
+    }
+
+    let userData: any = await db.select({
+            id: user.id,
+            name: user.name,
+            host: user.host
+        })
+        .from(user)
+        .where(eq(user.id, reqData.userData.id))
+        .limit(1);
+    if (userData.length < 1) {
+        ctx.status(404)
+        return ctx.text("USER NOT FOUND");
+    }
+
+    if (reqData.userData.auth == "OTT") {
+        if (!((reqData.token + reqData.userData.key) in tempToken)) {
+            ctx.status(401)
+            return ctx.text("USER NOT AUTHORIZED");
+        }
+        delete tempToken[reqData.token + reqData.userData.key];
+    } else {
+        const pass = Bun.SHA512.hash(Bun.env.APP_ID + reqData.userData.key, "hex");
+        let userData: any = await db.select().from(user).where(and(eq(user.id, reqData.userData.id), eq(user.pass, pass))).limit(1);
+        if (userData.length < 1) {
+            ctx.status(401);
+            return ctx.text("USER NOT AUTHORIZED");
+        }
+    }
+
+    ctx.set("pollData", pollData[0]);
+    ctx.set("userData", userData[0]);
+
+    await next();
+})
+
+//-------------------------- ROUTING --------------------------
 API.use('/*', cors({
     origin: (process.env.NODE_ENV !== "production") ? "*" : "*3mworkshop.org"
 }));
@@ -119,7 +197,8 @@ API.post("poll/data", async (ctx) => {
             description: poll.description,
             dateStart: poll.dateStart,
             dateEnd: poll.dateEnd,
-            timezone: poll.timezone
+            timezone: poll.timezone,
+            open: poll.open
         })
         .from(poll)
         .where(eq(poll.token, reqData.token))
@@ -137,8 +216,6 @@ API.post("poll/data", async (ctx) => {
     const users = await db.select()
         .from(user)
         .where(eq(user.pollId, pollData.id));
-
-    console.log(users);
 
     const usersAttendance = await db.select({
             userId: attendance.userId,
@@ -187,45 +264,9 @@ API.post("poll/data", async (ctx) => {
     });
 });
 
+API.use("poll/save", async (ctx, next) => checkAuth(ctx, next));
 API.post("poll/save", async (ctx) => {
     const reqData = await ctx.req.json();
-
-    let pollData: any = await db.select({
-            id: poll.id,
-            title: poll.title,
-            description: poll.description,
-            dateStart: poll.dateStart,
-            dateEnd: poll.dateEnd,
-            timezone: poll.timezone
-        })
-        .from(poll)
-        .where(eq(poll.token, reqData.token))
-        .limit(1);
-    if (pollData.length < 1) {
-        ctx.status(404)
-        return ctx.text("POLL NOT FOUND");
-    }
-
-    let userData: any = await db.select().from(user).where(eq(user.id, reqData.userData.id)).limit(1);
-    if (userData.length < 1) {
-        ctx.status(404)
-        return ctx.text("USER NOT FOUND");
-    }
-
-    if (reqData.userData.auth == "OTT") {
-        if (!((reqData.token + reqData.userData.key) in tempToken)) {
-            ctx.status(401)
-            return ctx.text("USER NOT AUTHORIZED");
-        }
-        delete tempToken[reqData.token + reqData.userData.key];
-    } else {
-        const pass = Bun.SHA512.hash(Bun.env.APP_ID + reqData.userData.key, "hex");
-        let userData: any = await db.select().from(user).where(and(eq(user.id, reqData.userData.id), eq(user.pass, pass))).limit(1);
-        if (userData.length < 1) {
-            ctx.status(401);
-            return ctx.text("USER NOT AUTHORIZED");
-        }
-    }
 
     let newAttData: {userId: number, date: string, timeslot:number, val: boolean}[] = [];
     for (const dateKey in (reqData.attData ?? {})) {
@@ -245,6 +286,50 @@ API.post("poll/save", async (ctx) => {
     return ctx.text("SAVED!");
 });
 
+API.use("poll/withdraw", async (ctx, next) => checkAuth(ctx, next));
+API.post("poll/withdraw", async (ctx) => {
+    await db.delete(user).where(eq(user.id, ctx.get("userData").id));
+    await db.delete(attendance).where(eq(attendance.userId, ctx.get("userData").id));
+    await db.delete(userInfo).where(eq(userInfo.userId, ctx.get("userData").id));
+    return ctx.text("Done!");
+});
+
+API.use("poll/delete-user", async (ctx, next) => checkAuth(ctx, next));
+API.post("poll/delete-user", async (ctx) => {
+    if (ctx.get("userData").host) {
+        const reqData = await ctx.req.json();
+        await db.delete(user).where(eq(user.id, reqData.userId));
+        await db.delete(attendance).where(eq(attendance.userId, reqData.userId));
+        await db.delete(userInfo).where(eq(userInfo.userId, reqData.userId));
+    }
+    
+    return ctx.text("Done!");
+});
+
+API.use("poll/set-open", async (ctx, next) => checkAuth(ctx, next));
+API.post("poll/set-open", async (ctx) => {
+    if (ctx.get("userData").host) {
+        const reqData = await ctx.req.json();
+        await db.update(poll).set({ open: reqData.open ?? true }).where(eq(poll.id, ctx.get("pollData").id));
+    }
+    return ctx.text("Done!");
+});
+
+API.use("poll/delete", async (ctx, next) => checkAuth(ctx, next));
+API.post("poll/delete", async (ctx) => {
+    if (ctx.get("userData").host) {
+        await db.delete(poll).where(eq(poll.id, ctx.get("pollData").id));
+        await db.delete(auxInfo).where(eq(auxInfo.id, ctx.get("pollData").id));
+        
+        const users = await db.select({ id: user.id }).from(user).where(eq(user.pollId, ctx.get("pollData").id));
+        await db.delete(user).where(inArray(user.id, users.map(e => e.id)));
+        await db.delete(attendance).where(inArray(attendance.userId, users.map(e => e.id)));
+        await db.delete(userInfo).where(inArray(userInfo.userId, users.map(e => e.id)));
+    }    
+    return ctx.text("Done!");
+});
+
+//-------------------------- ROUTINES --------------------------
 setInterval(() => {
     for (const key in tempToken) {
         if ((tempToken[key] ?? 0) < moment().valueOf()) {
