@@ -62,6 +62,7 @@ export function CreatePoll() {
         const swConf = await Swal.fire({
             title: "Create poll?",
             icon: "question",
+            theme: "dark",
             showCancelButton: true,
             focusConfirm: false,
             reverseButtons: true,
@@ -109,6 +110,7 @@ export function CreatePoll() {
         setLoading(false);
         Swal.fire({
             title: "Server Error",
+            theme: 'dark',
             icon: "error",
             text: "sorry for the inconvenience, please let admin know."
         });

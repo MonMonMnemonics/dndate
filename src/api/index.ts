@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { db } from "../lib/database";
 import { poll, user, auxInfo, attendance } from "../lib/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import moment from "moment";
 import type { UserData } from "@/common/types";
 
@@ -34,7 +34,7 @@ API.post('poll/create', async (ctx) => {
         name: reqData.name,
         pass: pass,
         host: true,        
-    }).returning({ id: user.id});
+    });
 
     if ((reqData.opts ?? []).length > 0) {
         await db.insert(auxInfo).values((reqData.opts).map((opt: string) => ({
@@ -69,11 +69,38 @@ API.post("poll/login", async (ctx) => {
         .limit(1);
 
     if (userData.length < 1) {
-        ctx.status(404)
+        ctx.status(400)
         return ctx.text("USER NOT FOUND");
     }
 
     return ctx.text('OK!');
+});
+
+API.post("poll/create-user", async (ctx) => {
+    const reqData = await ctx.req.json();
+    const pass = Bun.SHA512.hash(Bun.env.APP_ID + reqData.pass, "hex");
+
+    let pollData : any = await db.select({
+            id: poll.id,
+        })
+        .from(poll)
+        .where(eq(poll.token, reqData.token))
+        .limit(1);
+    
+    if (pollData.length < 1) {
+        ctx.status(418);
+        return ctx.text('AM A TEAPOT XD');
+    }
+
+    const newUser = await db.insert(user).values({
+        pollId: pollData[0].id,
+        name: reqData.name,
+        pass: pass
+    }).returning({ id: user.id});
+
+    return ctx.json({
+        userId: newUser[0]?.id,
+    });
 });
 
 API.post("poll/data", async (ctx) => {
@@ -107,7 +134,11 @@ API.post("poll/data", async (ctx) => {
 
     pollData = pollData[0];
 
-    const users = await db.select().from(user).where(eq(user.pollId, pollData.id));
+    const users = await db.select()
+        .from(user)
+        .where(eq(user.pollId, pollData.id));
+
+    console.log(users);
 
     const usersAttendance = await db.select({
             userId: attendance.userId,
@@ -124,7 +155,7 @@ API.post("poll/data", async (ctx) => {
             name: usr.name,
             host: usr.host ?? false,
             attendance: {}
-        }
+        };
     }
 
     for (const att of usersAttendance) {
@@ -142,7 +173,17 @@ API.post("poll/data", async (ctx) => {
     return ctx.json({
         firstSetup,
         pollData,
-        userData: Object.values(userData),
+        userData: Object.values(userData).sort((a, b) => {
+            if (a.host != b.host) {
+                if (a.host) {
+                    return(-1);
+                } else {
+                    return(1);
+                }
+            } else {
+                return a.name.localeCompare(b.name);
+            }
+        }),
     });
 });
 

@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import type { UserData } from "@/common/types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFloppyDisk, faHouse, faPenToSquare, faPlus, faQuestionCircle, faSpinner, faTrash, faUser } from "@fortawesome/free-solid-svg-icons";
+import { faFloppyDisk, faHatWizard, faHouse, faPenToSquare, faPlus, faQuestionCircle, faSpinner, faTrash, faUser, faUserPlus } from "@fortawesome/free-solid-svg-icons";
 
 export function Poll() {
     const { token } = useParams();
@@ -38,7 +38,7 @@ export function Poll() {
         
     }, [pollData.dateStart, pollData.dateEnd])
 
-    async function getPollData() {
+    async function getPollData(userId: number | null) {
         const res = await fetch("/api/poll/data", {
             method: "POST",
             headers: {
@@ -58,6 +58,7 @@ export function Poll() {
         if (res.status != 200) {
             Swal.fire({
                 title: "Server Error",
+                theme: 'dark',
                 icon: "error",
                 text: "sorry for the inconvenience, please let admin know."
             });
@@ -72,12 +73,22 @@ export function Poll() {
                 if (usr.host == true) {
                     setSelectedUser({
                         id: usr.id,
-                        host: false,
+                        host: usr.host,
                         auth: "OTT",
                         key: (window.sessionStorage.getItem("OTT-" + token) ?? "")
                     });
                     break;
                 }
+            }
+        } else if (userId) {
+            const userDt = (data.userData ?? []).find((e: any) => e.id === userId);
+            if (userDt) {
+                setSelectedUser({
+                    id: userId,
+                    host: userDt.host ?? false,
+                    auth: "PASS",
+                    key: newModal.pass
+                });
             }
         }
     }
@@ -147,6 +158,7 @@ export function Poll() {
     async function login(userName: string, userId: number) {
         const swConf = await Swal.fire({
             title: "Login",
+            theme: 'dark',
             input: "password",
             inputPlaceholder: "password...",
             inputLabel: "Password",
@@ -174,6 +186,7 @@ export function Poll() {
         if (failCheck >= 3) {
             Swal.fire({
                 title: "Login fail",
+                theme: 'dark',
                 icon: "error",
                 text: "Make sure you choose the right user and enter the right password"
             });
@@ -193,8 +206,7 @@ export function Poll() {
         });
         setLoading(false);
 
-        if (res.status !== 200) {
-            
+        if (res.status !== 200) {            
             setFailCheck(failCheck + 1);
 
             if (failCheck > 2) {
@@ -205,6 +217,7 @@ export function Poll() {
             
             Swal.fire({
                 title: "Login fail",
+                theme: 'dark',
                 icon: "error",
                 text: "Make sure you choose the right user and enter the right password"
             });
@@ -212,12 +225,14 @@ export function Poll() {
         }
 
         const userDt = userData.find(e => e.id === userId);
-        setSelectedUser({
-            id: userId,
-            host: userDt?.host ?? false,
-            auth: "PASS",
-            key: swConf.value
-        });
+        if (userDt)  {
+            setSelectedUser({
+                id: userId,
+                host: userDt.host ?? false,
+                auth: "PASS",
+                key: swConf.value
+            });
+        }
     }
 
     async function save() {
@@ -227,6 +242,7 @@ export function Poll() {
 
         const swConf = await Swal.fire({
             title: "Save changes?",
+            theme: 'dark',
             icon: "question",
             showCancelButton: true,
             focusConfirm: false,
@@ -252,12 +268,13 @@ export function Poll() {
                     userData: selectedUser,
                     attData: userDt.attendance,
                 })
-            })            
+            });
 
             if (res.status !== 200) {
                 setLoading(false);
                 Swal.fire({
                     title: "Server Error",
+                    theme: 'dark',
                     icon: "error",
                     text: "sorry for the inconvenience, please let admin know."
                 });
@@ -270,6 +287,7 @@ export function Poll() {
 
         Swal.fire({
             title: "Data Saved!",
+            theme: 'dark',
             icon: "success",
         });
 
@@ -286,6 +304,38 @@ export function Poll() {
         name: "",
         pass: "",
     });
+
+    async function submitNewUser() {
+        setLoading(true);
+        const res = await fetch("/api/poll/create-user", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                name: newModal.name,
+                pass: newModal.pass,
+                token: token
+            })
+        });
+
+        if (res.status !== 200) {
+            setLoading(false);
+            Swal.fire({
+                title: "Server Error",
+                theme: 'dark',
+                icon: "error",
+                text: "sorry for the inconvenience, please let admin know."
+            });
+            return;
+        }
+
+        const resData = await res.json();
+        await getPollData(resData.userId);
+
+        setLoading(false);
+        setNewModal({...newModal, show:false});
+    }
 
     if (!pollExist) {
         return (
@@ -313,10 +363,10 @@ export function Poll() {
     return (
         <div className="flex flex-col w-screen h-screen p-3 gap-3">
             { loading && 
-                <div className="fixed h-full w-full z-10 flex flex-row">
-                    <div className="bg-black opacity-40 fixed h-full w-full z-11"></div>
+                <div className="fixed h-full w-full z-20 flex flex-row">
+                    <div className="bg-black opacity-40 fixed h-full w-full z-21"></div>
                     <div className="mx-auto flex flex-col">
-                        <div className="my-auto rounded-lg p-8 border border-black bg-dark-secondary z-12 flex flex-col font-bold text-3xl gap-5">
+                        <div className="my-auto rounded-lg p-8 border border-black bg-dark-secondary z-22 flex flex-col font-bold text-3xl gap-5">
                             <div className="w-full flex flex-row justify-center">
                                 <FontAwesomeIcon className="text-[10em] animate-spin" icon={faSpinner} />
                             </div>
@@ -329,11 +379,62 @@ export function Poll() {
             { newModal.show && 
                 <div className="fixed h-full w-full z-10 flex flex-row">
                     <div className="bg-black opacity-40 fixed h-full w-full z-11" onClick={() => setNewModal({...newModal, show: false})}></div>
-                    <div className="mx-auto flex flex-col">
-                        <div className="my-auto rounded-lg p-8 border border-black bg-dark-secondary z-12 flex flex-col font-bold">
-                            <div>TEST</div>
+                    <form className="mx-auto flex flex-col">
+                        <div className="my-auto rounded-lg p-8 border border-black bg-dark-secondary z-12 flex flex-col font-bold gap-3">
+                            <div className="w-full text-center align-middle text-2xl">
+                                Add New Member
+                            </div>
+                            <hr className="h-px my-2 bg-white border-0"/>
+                            <div className="flex flex-row gap-2 items-center w-full">
+                                <div className="text-nowrap text-xl">Name:</div>
+                                <input
+                                    type="text"
+                                    value={newModal.name}
+                                    onChange={(e) => setNewModal({...newModal, name: e.target.value})}
+                                    placeholder="Username..."
+                                    className="dark-input w-full p-2 rounded border font-light"
+                                    maxLength={20}
+                                    required
+                                />
+                            </div>
+                            <div className="flex flex-col items-center w-full">
+                                <div className="flex flex-row gap-2 items-center w-full">
+                                    <div className="text-nowrap text-xl">Password:</div>
+                                    <input
+                                        type="password"
+                                        value={newModal.pass}
+                                        onChange={(e) => setNewModal({...newModal, pass: e.target.value})}
+                                        placeholder="password"
+                                        className="dark-input w-full p-2 rounded border font-light"
+                                        maxLength={40}
+                                        required
+                                    />
+                                </div>
+                                <div className="text-sm">*You'll only need this password to edit your answer later</div>
+                            </div>
+                            <div className="flex flex-row items-center justify-between">
+                                <button className="bg-red-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center text-xl"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setNewModal({...newModal, show:false});
+                                    }} type="button"
+                                >
+                                    <div className="font-bold">Cancel</div>
+                                </button>
+                                <button className="bg-green-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center text-xl"
+                                    onClick={(e) => {
+                                        if ((newModal.name != "") && (newModal.pass != "")) {
+                                            e.preventDefault();
+                                            submitNewUser();
+                                        }                                        
+                                    }} type="submit"
+                                >
+                                    <FontAwesomeIcon icon={faUserPlus} />
+                                    <div className="font-bold">Submit</div>
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
             }
             <div className="bg-dark-secondary rounded-lg p-3 border border-gray-500 text-dark-text flex flex-col gap-2 h-[33%]">
@@ -472,6 +573,13 @@ export function Poll() {
                                     <tr key={'tr-' + idx} style={{ height: '3em' }} onMouseLeave={mouseLeave}>
                                         <th className='sticky text-nowrap left-0 align-middle px-3 min-w-[20ch]' style={{ zIndex: 1 }}>
                                             <div className='flex flex-row items-center gap-3 w-full'>
+                                                {
+                                                    (user.host == true) ?
+                                                    <Fragment>
+                                                        <FontAwesomeIcon icon={faHatWizard}/>
+                                                    </Fragment>
+                                                    : null
+                                                }
                                                 <div className="me-auto">{user.name}</div>
                                                 {
                                                     (selectedUser.id == -1) ?
