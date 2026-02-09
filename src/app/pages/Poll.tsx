@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import type { UserData } from "@/common/types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBan, faCircleInfo, faFloppyDisk, faHatWizard, faHouse, faInfoCircle, faLockOpen, faPenToSquare, faPlus, faQuestionCircle, faSpinner, faTrash, faUser, faUserPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faBan, faCircleInfo, faFloppyDisk, faHatWizard, faHouse, faInfoCircle, faLeaf, faLockOpen, faPenToSquare, faPersonChalkboard, faPlus, faQuestionCircle, faSpinner, faTrash, faUser, faUserPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { auxInfoEnum } from "@/common/consts";
 
 interface NewModal {
@@ -662,24 +662,45 @@ export function Poll() {
                                 {auxInfoModal.name}
                             </div>
                             <hr className="h-px my-2 bg-white border-0"/>
-                            <div className="flex flex-col gap-2 items-center w-full">
-                                <div className="text-nowrap text-xl">Veils:</div>
-                                <textarea
-                                    value={auxInfoModal.auxInfo[auxInfoEnum.veils]}
-                                    placeholder="None"
-                                    className="dark-input w-full p-2 rounded border font-light resize-none h-[7em]"
-                                    readOnly={true}
-                                />
-                            </div>
-                            <div className="flex flex-col gap-2 items-center w-full">
-                                <div className="text-nowrap text-xl">Lines:</div>
-                                <textarea
-                                    value={auxInfoModal.auxInfo[auxInfoEnum.lines]}
-                                    placeholder="None"
-                                    className="dark-input w-full p-2 rounded border font-light resize-none h-[7em]"
-                                    readOnly={true}
-                                />
-                            </div>
+                            {
+                                pollData.auxInfoCodes.includes(auxInfoEnum.discordHandle) ?
+                                <div className="flex flex-row gap-2 items-center w-full">
+                                    <div className="text-nowrap text-xl">Discord name:</div>
+                                    <input
+                                        value={auxInfoModal.auxInfo[auxInfoEnum.discordHandle]}
+                                        placeholder="..."
+                                        className="dark-input w-full p-2 rounded border font-light"
+                                        readOnly={true}
+                                    />
+                                </div>
+                                : null
+                            }
+                            {
+                                pollData.auxInfoCodes.includes(auxInfoEnum.veils) ?
+                                <div className="flex flex-col gap-2 items-center w-full">
+                                    <div className="text-nowrap text-xl">Veils:</div>
+                                    <textarea
+                                        value={auxInfoModal.auxInfo[auxInfoEnum.veils]}
+                                        placeholder="None"
+                                        className="dark-input w-full p-2 rounded border font-light resize-none h-[7em]"
+                                        readOnly={true}
+                                    />
+                                </div>
+                                : null
+                            }
+                            {
+                                pollData.auxInfoCodes.includes(auxInfoEnum.lines) ?
+                                <div className="flex flex-col gap-2 items-center w-full">
+                                    <div className="text-nowrap text-xl">Lines:</div>
+                                    <textarea
+                                        value={auxInfoModal.auxInfo[auxInfoEnum.lines]}
+                                        placeholder="None"
+                                        className="dark-input w-full p-2 rounded border font-light resize-none h-[7em]"
+                                        readOnly={true}
+                                    />
+                                </div>
+                                : null
+                            }
                             <div className="flex flex-row items-center justify-center w- full">
                                 <button className="bg-blue-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center text-xl"
                                     onClick={() => setAuxInfoModal({...auxInfoModal, show: false})}
@@ -906,6 +927,24 @@ export function Poll() {
                         </div>
                     </div>
                 </div>
+                <div className="flex flex-row text-sm font-bold items-center gap-4 px-2">
+                    {
+                        pollData.auxInfoCodes.includes(auxInfoEnum.firstTimer) ?
+                        <div className="flex flex-row items-center gap-1">
+                            <FontAwesomeIcon icon={faLeaf} className="text-green-600"/>
+                            <div>: First-timer</div>
+                        </div>
+                        : null
+                    }
+                    {
+                        pollData.auxInfoCodes.includes(auxInfoEnum.helpCharCreate) && (selectedUser.host) ?
+                        <div className="flex flex-row items-center gap-1">
+                            <FontAwesomeIcon icon={faPersonChalkboard}/>
+                            <div>: Need a guide creating char</div>
+                        </div>
+                        : null
+                    }
+                </div>
                 
                 <div className="grow flex flex-row gap-5">
                     <div className='relative grow select-none flex flex-col'>
@@ -942,6 +981,10 @@ export function Poll() {
                                                         </div>
                                                         : null
                                                     }
+                                                    { pollData.auxInfoCodes.includes(auxInfoEnum.firstTimer) && (user.auxInfo[auxInfoEnum.firstTimer] ?? false) ?
+                                                            <FontAwesomeIcon icon={faLeaf} className="text-green-600" />
+                                                        : null
+                                                    }
                                                     {
                                                         (selectedUser.id == -1) ?
                                                         <Fragment>
@@ -949,12 +992,17 @@ export function Poll() {
                                                         </Fragment>
                                                         : ((selectedUser.host) && (user.id !== selectedUser.id)) ?
                                                         <Fragment>
+                                                            { pollData.auxInfoCodes.includes(auxInfoEnum.helpCharCreate) && (user.auxInfo[auxInfoEnum.helpCharCreate] ?? false) ?
+                                                                    <FontAwesomeIcon icon={faPersonChalkboard}/>
+                                                                : null
+                                                            }
                                                             {
                                                                 (pollData.auxInfo.length > 0) ?
                                                                 <FontAwesomeIcon className="cursor-pointer" icon={faCircleInfo} onClick={() => setAuxInfoModal({
                                                                     show: true,
                                                                     name: user.name,
                                                                     auxInfo: {
+                                                                        [auxInfoEnum.discordHandle]: user.auxInfo[auxInfoEnum.discordHandle] ?? "",
                                                                         [auxInfoEnum.veils]: user.auxInfo[auxInfoEnum.veils] ?? "",
                                                                         [auxInfoEnum.lines]: user.auxInfo[auxInfoEnum.lines] ?? "",
                                                                     }
