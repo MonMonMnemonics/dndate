@@ -1,35 +1,36 @@
-import { memo, Fragment, useState } from 'react';
+import { memo, Fragment, useState, useEffect } from 'react';
 import moment from "moment";
 import type { FC } from 'react';
-import type { UserData, PollData } from '@/common/types';
+import type { UserData } from '@/common/types';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleInfo, faDiceD20, faHatWizard, faLeaf, faPenToSquare, faPersonChalkboard, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { auxInfoEnum } from "@/common/consts";
 
 type Props = {
     pollStyle: string;
-    dates: string[];
     userData: UserData[];
-    pollData: PollData;
-    hostClosed: string[];
     activeUserId: number;
     isHost: boolean;
+    dateStart: string;
+    dateEnd: string;
+    auxInfoCodes: string[];
+    brushType: number;
 
     login: ((userName: string, userId: number) => void);
     switchCellColour: ((date: string, timeslotIdx: number) => void);
     deleteUser: ((userName: string, userId: number) => void);
     setAuxInfoModal: ((n : any) => void);
-    setSelectedUser: ((n : any) => void);
 };
 
 export const ScheduleTable: FC<Props> = memo(({ 
     pollStyle,
-    dates,
     userData,
-    pollData,
-    hostClosed,
     activeUserId,
     isHost,
+    dateStart,
+    dateEnd,
+    auxInfoCodes,
+    brushType,
 
     login,
     switchCellColour,
@@ -37,6 +38,37 @@ export const ScheduleTable: FC<Props> = memo(({
     setAuxInfoModal,
 }) => {
     const [ brushActive, setBrushActive ] = useState(false);
+    
+    const [ hostClosed, setHostClosed ] = useState<string[]>([]);
+    useEffect(() => {
+        let newHostClosed : string[] = [];
+        for (const user of userData) {
+            if (user.host) {
+                for (const dateKey in user.attendance) {
+                    if (!user.attendance[dateKey]) {
+                        newHostClosed.push(dateKey);
+                    }
+                }
+            }
+        }
+
+        setHostClosed([...new Set(newHostClosed)]);
+    }, [userData]);
+
+    const [ dates, setDates ] = useState<string[]>([]);
+    useEffect(() => {
+        let start = moment(dateStart);
+        const end = moment(dateEnd);
+
+        let dateArray: string[] = [];
+        while (!start.isAfter(end)) {
+            dateArray.push(start.format("YYYY-MM-DD"));
+            start = start.add(1, "d");
+        }
+
+        setDates(dateArray);
+        
+    }, [dateStart, dateEnd])
 
     function mouseDown(date: string, timeslotIdx: number) {
         setBrushActive(true);
@@ -92,7 +124,7 @@ export const ScheduleTable: FC<Props> = memo(({
                                                 </div>
                                                 : null
                                             }
-                                            { pollData.auxInfoCodes.includes(auxInfoEnum.firstTimer) && (user.auxInfo[auxInfoEnum.firstTimer] ?? false) ?
+                                            { auxInfoCodes.includes(auxInfoEnum.firstTimer) && (user.auxInfo[auxInfoEnum.firstTimer] ?? false) ?
                                                     <FontAwesomeIcon icon={faLeaf} className="text-green-600" />
                                                 : null
                                             }
@@ -103,12 +135,12 @@ export const ScheduleTable: FC<Props> = memo(({
                                                 </Fragment>
                                                 : ((isHost) && (user.id !== activeUserId)) ?
                                                 <Fragment>
-                                                    { pollData.auxInfoCodes.includes(auxInfoEnum.helpCharCreate) && (user.auxInfo[auxInfoEnum.helpCharCreate] ?? false) ?
+                                                    { auxInfoCodes.includes(auxInfoEnum.helpCharCreate) && (user.auxInfo[auxInfoEnum.helpCharCreate] ?? false) ?
                                                             <FontAwesomeIcon icon={faPersonChalkboard}/>
                                                         : null
                                                     }
                                                     {
-                                                        (pollData.auxInfo.length > 0) ?
+                                                        (auxInfoCodes.length > 0) ?
                                                         <FontAwesomeIcon className="cursor-pointer" icon={faCircleInfo} onClick={() => setAuxInfoModal({
                                                             show: true,
                                                             name: user.name,
@@ -204,7 +236,7 @@ export const ScheduleTable: FC<Props> = memo(({
                                                         </div>
                                                         : null
                                                     }
-                                                    { pollData.auxInfoCodes.includes(auxInfoEnum.firstTimer) && (user.auxInfo[auxInfoEnum.firstTimer] ?? false) ?
+                                                    { auxInfoCodes.includes(auxInfoEnum.firstTimer) && (user.auxInfo[auxInfoEnum.firstTimer] ?? false) ?
                                                             <FontAwesomeIcon icon={faLeaf} className="text-green-600" />
                                                         : null
                                                     }
@@ -215,12 +247,12 @@ export const ScheduleTable: FC<Props> = memo(({
                                                         </Fragment>
                                                         : ((isHost) && (user.id !== activeUserId)) ?
                                                         <Fragment>
-                                                            { pollData.auxInfoCodes.includes(auxInfoEnum.helpCharCreate) && (user.auxInfo[auxInfoEnum.helpCharCreate] ?? false) ?
+                                                            { auxInfoCodes.includes(auxInfoEnum.helpCharCreate) && (user.auxInfo[auxInfoEnum.helpCharCreate] ?? false) ?
                                                                     <FontAwesomeIcon icon={faPersonChalkboard}/>
                                                                 : null
                                                             }
                                                             {
-                                                                (pollData.auxInfo.length > 0) ?
+                                                                (auxInfoCodes.length > 0) ?
                                                                 <FontAwesomeIcon className="cursor-pointer" icon={faCircleInfo} onClick={() => setAuxInfoModal({
                                                                     show: true,
                                                                     name: user.name,
@@ -286,4 +318,4 @@ export const ScheduleTable: FC<Props> = memo(({
             </div>
         </div>
     )
-})
+});

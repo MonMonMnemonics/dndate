@@ -4,11 +4,11 @@ import { useParams, useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import type { UserData, SelectedUser, PollData } from "@/common/types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBan, faFloppyDisk, faHouse, faLeaf, faLockOpen, faMaximize, faMinimize, faPersonChalkboard, faPlus, faQuestionCircle, faSpinner, faUser, faUserPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faBan, faFloppyDisk, faHouse, faInfoCircle, faLeaf, faLockOpen, faMaximize, faMinimize, faPersonChalkboard, faPlus, faQuestionCircle, faSpinner, faUser, faUserPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { auxInfoEnum } from "@/common/consts";
 import { ScheduleTable } from "../components/ScheduleTable";
-import { AuxPanel } from "../components/AuxPanel";
 import { NewUserModal } from "../components/NewUserModal";
+import { AuxInfoEditModal } from "../components/AuxInfoEditModal";
 
 export function Poll() {
     const { token } = useParams();
@@ -25,9 +25,8 @@ export function Poll() {
         timezone: "GMT +00:00",
         open: true,
         auxInfo: [],
-        auxInfoCodes: []
+        auxInfoCodes: [],
     });
-    const [ dates, setDates ] = useState<string[]>([]);
     const [ userData, setUserData ] = useState<UserData[]>([]);
 
     useEffect(() => {
@@ -36,20 +35,6 @@ export function Poll() {
             setPollStyle("HORIZONTAL");
         }
     }, []);
-
-    useEffect(() => {
-        let start = moment(pollData.dateStart);
-        const end = moment(pollData.dateEnd);
-
-        let dateArray: string[] = [];
-        while (!start.isAfter(end)) {
-            dateArray.push(start.format("YYYY-MM-DD"));
-            start = start.add(1, "d");
-        }
-
-        setDates(dateArray);
-        
-    }, [pollData.dateStart, pollData.dateEnd])
 
     async function getPollData(userId: number | null = null, pass: string | null = null) {
         const res = await fetch("/api/poll/data", {
@@ -332,25 +317,8 @@ export function Poll() {
     });
 
     const [ brushType, setBrushType ] = useState(1);
-    const [ brushActive, setBrushActive ] = useState(false);
     const [ loading, setLoading ] = useState(false);
     const [ failCheck, setFailCheck ] = useState(0);
-    const [ hostClosed, setHostClosed ] = useState<string[]>([]);
-
-    useEffect(() => {
-        let newHostClosed : string[] = [];
-        for (const user of userData) {
-            if (user.host) {
-                for (const dateKey in user.attendance) {
-                    if (!user.attendance[dateKey]) {
-                        newHostClosed.push(dateKey);
-                    }
-                }
-            }
-        }
-
-        setHostClosed([...new Set(newHostClosed)]);
-    }, [userData]);
 
     function switchCellColour(date: string, timeslotIdx: number) {
         if (selectedUser.id != -1) {
@@ -573,6 +541,8 @@ export function Poll() {
         auxInfo: {}
     })
 
+    const [ showAuxInfoEditModal, setShowAuxInfoEditModal ] = useState(false);
+
     if (!pollExist) {
         return (
             <div className="flex flex-col w-screen h-screen p-3 gap-3">
@@ -681,6 +651,17 @@ export function Poll() {
                 submitNewUser={submitNewUser}
             />
 
+            <AuxInfoEditModal
+                show={showAuxInfoEditModal}
+                auxInfo={pollData.auxInfo}
+                initData={selectedUser.auxInfo}
+                closeModal={() => setShowAuxInfoEditModal(false)}
+                saveData={(newAuxInfo) => {
+                    setShowAuxInfoEditModal(false);
+                    setSelectedUser({...selectedUser, auxInfo: newAuxInfo});
+                }}
+            />
+
             <div className={"bg-dark-secondary rounded-lg p-3 border border-gray-500 text-dark-text flex flex-col gap-2" + ((fullView) ? "" :  " h-[33%]")}>
                 <div className="flex flex-row">
                     <button className="dark-button p-1 text-2xl rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center"
@@ -778,6 +759,16 @@ export function Poll() {
                                 {
                                     (!selectedUser.host) ?
                                         <Fragment>
+                                            {
+                                                (pollData.auxInfo.length > 0) ?
+                                                    <button className="bg-blue-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center text-xl"
+                                                        onClick={() => setShowAuxInfoEditModal(true)} type="button"
+                                                    >
+                                                        <FontAwesomeIcon icon={faInfoCircle} />
+                                                        <div className="font-bold">Edit Answer</div>
+                                                    </button>
+                                                : null
+                                            }
                                             <button className="bg-red-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center text-xl"
                                                 onClick={withdrawApplication} type="button"
                                             >
@@ -865,24 +856,18 @@ export function Poll() {
                 <div className="grow flex flex-row gap-5">
                     <ScheduleTable
                         pollStyle={pollStyle}
-                        dates={dates}
                         userData={userData}
-                        pollData={pollData}
-                        hostClosed={hostClosed}
+                        dateEnd={pollData.dateEnd}
+                        dateStart={pollData.dateStart}
+                        auxInfoCodes={pollData.auxInfoCodes}
                         activeUserId={selectedUser.id}
                         isHost={selectedUser.host}
+                        brushType={brushType}
 
                         login={login}
                         switchCellColour={switchCellColour}
                         deleteUser={deleteUser}
                         setAuxInfoModal={setAuxInfoModal}
-                        setSelectedUser={setSelectedUser}
-                    />
-                    <AuxPanel
-                        show={(pollData.auxInfo.length > 0) && (selectedUser.id != -1) && (!selectedUser.host) && (!fullView)}
-                        pollData={pollData}
-                        selectedUser={selectedUser}
-                        setSelectedUser={setSelectedUser}
                     />
                 </div>
             </div>

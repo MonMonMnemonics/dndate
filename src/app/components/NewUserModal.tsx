@@ -1,10 +1,17 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserPlus } from "@fortawesome/free-solid-svg-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export const NewUserModal = ({ show, closeModal, submitNewUser }: { show: boolean, closeModal: (() => void), submitNewUser: ((name: string, pass: string) => void)}) => {
     const [ name, setName ] = useState("");
     const [ pass, setPass ] = useState("");
+
+    useEffect(() => {
+        if (show) {
+            setName("");
+            setPass("");
+        }        
+    }, [show]);
 
     if (show) {
         return(
