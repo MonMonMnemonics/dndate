@@ -225,7 +225,7 @@ export function CreatePoll() {
                         </select>
                     </div>
                     <div className="flex flex-col gap-1 w-full">
-                        <div className="text-nowrap text-xl">Extra opts:</div>
+                        <div className="text-nowrap text-xl">Add extra questions:</div>
                         <ul className="list-none">
                             {Object.entries(extraOpts).map(([key, opt]) => (
                                 <li className="flex flex-row gap-2 items-center" key={"opts-" + key}>
