@@ -1,6 +1,6 @@
 import moment from "moment";
 import { Fragment, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import type { UserData } from "@/common/types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -37,7 +37,9 @@ interface PollData {
 
 export function Poll() {
     const { token } = useParams();
+    const [ searchParams ] = useSearchParams();
     const [ pollExist, setPollExist ] = useState(true);
+    const [ pollStyle, setPollStyle ] = useState("HORIZONTAL");
 
     const [ pollData, setPollData ] = useState<PollData>({
         title: "POLL",
@@ -54,6 +56,9 @@ export function Poll() {
 
     useEffect(() => {
         getPollData();
+        if ((searchParams.get("style") ?? "A") == "B") {
+            setPollStyle("VERTICAL");
+        }
     }, []);
 
     useEffect(() => {
@@ -948,104 +953,200 @@ export function Poll() {
                 
                 <div className="grow flex flex-row gap-5">
                     <div className='relative grow select-none flex flex-col'>
-                        <div className="h-full w-full absolute overflow-auto m-2">
-                            <table className='poll' style={{ width: 'auto' }}>
-                                <thead className="sticky top-0" style={{ zIndex: 2 }}>
-                                    <tr>
-                                        <th rowSpan={2} className='sticky left-0 top-0 align-middle text-center' style={{ zIndex: 2 }}>Name</th>
-                                        { dates.map(date => (
-                                            <th key={'header-' + date} colSpan={48}>{moment(date).format('YYYY-MM-DD (dddd)')}</th>
-                                        ))}
-                                    </tr>
-                                    <tr>
-                                        { dates.map((date) => {
-                                            return Array.from(Array(24).keys()).map((timeslotIdx) => (
-                                                <th key={date + "-" + timeslotIdx} className={"timeslot min-w-[6ch] ps-2 text-start " + (((timeslotIdx % 2) == 0) ? "even" : "odd")} colSpan={2}>
-                                                    {timeslotIdx}
-                                                </th>
-                                            ))
-                                        })}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {userData.map((user, idx) => (
-                                        <tr key={'tr-' + idx} style={{ height: '3em' }} onMouseLeave={mouseLeave}>
-                                            <th className='sticky text-nowrap left-0 align-middle px-3 min-w-[30ch]' style={{ zIndex: 1 }}>
-                                                <div className='flex flex-row items-center gap-3 w-full'>
-                                                    <div className="me-auto">{user.name}</div>
-                                                    {
-                                                        (user.host == true) ?
-                                                        <div className='flex flex-row items-center gap-1'>
-                                                            <div>GM</div>
-                                                            <FontAwesomeIcon icon={faHatWizard}/>
-                                                        </div>
-                                                        : null
-                                                    }
-                                                    { pollData.auxInfoCodes.includes(auxInfoEnum.firstTimer) && (user.auxInfo[auxInfoEnum.firstTimer] ?? false) ?
-                                                            <FontAwesomeIcon icon={faLeaf} className="text-green-600" />
-                                                        : null
-                                                    }
-                                                    {
-                                                        (selectedUser.id == -1) ?
-                                                        <Fragment>
-                                                            <FontAwesomeIcon className="cursor-pointer" icon={faPenToSquare} onClick={() => login(user.name, user.id)}/>
-                                                        </Fragment>
-                                                        : ((selectedUser.host) && (user.id !== selectedUser.id)) ?
-                                                        <Fragment>
-                                                            { pollData.auxInfoCodes.includes(auxInfoEnum.helpCharCreate) && (user.auxInfo[auxInfoEnum.helpCharCreate] ?? false) ?
-                                                                    <FontAwesomeIcon icon={faPersonChalkboard}/>
-                                                                : null
-                                                            }
-                                                            {
-                                                                (pollData.auxInfo.length > 0) ?
-                                                                <FontAwesomeIcon className="cursor-pointer" icon={faCircleInfo} onClick={() => setAuxInfoModal({
-                                                                    show: true,
-                                                                    name: user.name,
-                                                                    auxInfo: {
-                                                                        [auxInfoEnum.discordHandle]: user.auxInfo[auxInfoEnum.discordHandle] ?? "",
-                                                                        [auxInfoEnum.veils]: user.auxInfo[auxInfoEnum.veils] ?? "",
-                                                                        [auxInfoEnum.lines]: user.auxInfo[auxInfoEnum.lines] ?? "",
-                                                                    }
-                                                                })}/>
-                                                                : null
-                                                            }
-                                                            <FontAwesomeIcon className="cursor-pointer text-red-500" icon={faTrash} onClick={() => deleteUser(user.name, user.id)}/>
-                                                        </Fragment>
-                                                        : null
-                                                    }
-                                                </div>
-                                            </th>
-                                            {dates.map((date) => {
-                                                return Array.from(Array(24*2).keys()).map((idx2) => {
-                                                    const dateKey = date + "-" + idx2.toString();
-                                                    let attType = "open";
-
-                                                    if (hostClosed.includes(dateKey)) {
-                                                        attType = "closed";
-                                                    } else if (dateKey in user.attendance) {
-                                                        if (user.attendance[dateKey]) {
-                                                            attType = "preferred";
-                                                        } else {
-                                                            attType = "closed";
-                                                        }
-                                                    }
-
-                                                    if ((selectedUser.id == user.id) && ((!hostClosed.includes(dateKey)) || (selectedUser.host))) {
-                                                        return <td 
-                                                            key={idx + "-" + date + '-' + idx2} className={attType} onMouseUp={mouseLeave}
-                                                            onMouseDown={() => mouseDown(date, idx2)} onMouseEnter={() => mouseEnter(date, idx2)}
-                                                        ></td>;
-                                                    } else {
-                                                        return <td 
-                                                            key={idx + "-" + date + '-' + idx2} className={attType} onMouseUp={mouseLeave}
-                                                        ></td>;
-                                                    }                                                
-                                                })
+                        <div className="h-full w-full flex flex-col absolute overflow-auto m-2">
+                            {
+                                (pollStyle == "HORIZONTAL") ?
+                                <table className='poll' style={{ width: 'auto' }}>
+                                    <thead className="sticky top-0" style={{ zIndex: 2 }}>
+                                        <tr>
+                                            <th rowSpan={2} className='sticky left-0 top-0 align-middle text-center' style={{ zIndex: 2 }}>Name</th>
+                                            { dates.map(date => (
+                                                <th key={'header-' + date} className="date-header" colSpan={48}>{moment(date).format('YYYY-MM-DD (dddd)')}</th>
+                                            ))}
+                                        </tr>
+                                        <tr>
+                                            { dates.map((date) => {
+                                                return Array.from(Array(24).keys()).map((timeslotIdx) => (
+                                                    <th key={date + "-" + timeslotIdx} className={"timeslot min-w-[6ch] ps-2 text-start " + (((timeslotIdx % 2) == 0) ? "even" : "odd")} colSpan={2}>
+                                                        {timeslotIdx}
+                                                    </th>
+                                                ))
                                             })}
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {userData.map((user, idx) => (
+                                            <tr key={'tr-' + idx} style={{ height: '3em' }} onMouseLeave={mouseLeave}>
+                                                <th className='sticky text-nowrap left-0 align-middle px-3 min-w-[30ch]' style={{ zIndex: 1 }}>
+                                                    <div className='flex flex-row items-center gap-3 w-full'>
+                                                        <div className="me-auto">{user.name}</div>
+                                                        {
+                                                            (user.host == true) ?
+                                                            <div className='flex flex-row items-center gap-1'>
+                                                                <div>GM</div>
+                                                                <FontAwesomeIcon icon={faHatWizard}/>
+                                                            </div>
+                                                            : null
+                                                        }
+                                                        { pollData.auxInfoCodes.includes(auxInfoEnum.firstTimer) && (user.auxInfo[auxInfoEnum.firstTimer] ?? false) ?
+                                                                <FontAwesomeIcon icon={faLeaf} className="text-green-600" />
+                                                            : null
+                                                        }
+                                                        {
+                                                            (selectedUser.id == -1) ?
+                                                            <Fragment>
+                                                                <FontAwesomeIcon className="cursor-pointer" icon={faPenToSquare} onClick={() => login(user.name, user.id)}/>
+                                                            </Fragment>
+                                                            : ((selectedUser.host) && (user.id !== selectedUser.id)) ?
+                                                            <Fragment>
+                                                                { pollData.auxInfoCodes.includes(auxInfoEnum.helpCharCreate) && (user.auxInfo[auxInfoEnum.helpCharCreate] ?? false) ?
+                                                                        <FontAwesomeIcon icon={faPersonChalkboard}/>
+                                                                    : null
+                                                                }
+                                                                {
+                                                                    (pollData.auxInfo.length > 0) ?
+                                                                    <FontAwesomeIcon className="cursor-pointer" icon={faCircleInfo} onClick={() => setAuxInfoModal({
+                                                                        show: true,
+                                                                        name: user.name,
+                                                                        auxInfo: {
+                                                                            [auxInfoEnum.discordHandle]: user.auxInfo[auxInfoEnum.discordHandle] ?? "",
+                                                                            [auxInfoEnum.veils]: user.auxInfo[auxInfoEnum.veils] ?? "",
+                                                                            [auxInfoEnum.lines]: user.auxInfo[auxInfoEnum.lines] ?? "",
+                                                                        }
+                                                                    })}/>
+                                                                    : null
+                                                                }
+                                                                <FontAwesomeIcon className="cursor-pointer text-red-500" icon={faTrash} onClick={() => deleteUser(user.name, user.id)}/>
+                                                            </Fragment>
+                                                            : null
+                                                        }
+                                                    </div>
+                                                </th>
+                                                {dates.map((date) => {
+                                                    return Array.from(Array(24*2).keys()).map((idx2) => {
+                                                        const dateKey = date + "-" + idx2.toString();
+                                                        let attType = "open";
+
+                                                        if (hostClosed.includes(dateKey)) {
+                                                            attType = "closed";
+                                                        } else if (dateKey in user.attendance) {
+                                                            if (user.attendance[dateKey]) {
+                                                                attType = "preferred";
+                                                            } else {
+                                                                attType = "closed";
+                                                            }
+                                                        }
+
+                                                        if ((selectedUser.id == user.id) && ((!hostClosed.includes(dateKey)) || (selectedUser.host))) {
+                                                            return <td 
+                                                                key={idx + "-" + date + '-' + idx2} className={attType} onMouseUp={mouseLeave}
+                                                                onMouseDown={() => mouseDown(date, idx2)} onMouseEnter={() => mouseEnter(date, idx2)}
+                                                            ></td>;
+                                                        } else {
+                                                            return <td 
+                                                                key={idx + "-" + date + '-' + idx2} className={attType} onMouseUp={mouseLeave}
+                                                            ></td>;
+                                                        }                                                
+                                                    })
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                : (pollStyle == "VERTICAL") ?
+                                <table className='poll w-full' style={{ width: 'auto' }}>
+                                    <tbody>
+                                        {dates.map((date) => 
+                                            <Fragment key={'v-' + date}>
+                                                <tr><th colSpan={49} className="date-header">{moment(date).format('YYYY-MM-DD (dddd)')}</th></tr>
+                                                <tr>
+                                                    <th></th>
+                                                    { Array.from(Array(24).keys()).map((timeslotIdx) => (
+                                                        <th key={date + "-" + timeslotIdx} className={"timeslot ps-2 text-start " + (((timeslotIdx % 2) == 0) ? "even" : "odd")} colSpan={2}>
+                                                            {timeslotIdx}
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                                {userData.map((user, idx) => (
+                                                    <tr key={'tr-' + idx} style={{ height: '3em' }} onMouseLeave={mouseLeave}>
+                                                        <th className='sticky text-nowrap left-0 align-middle px-3 min-w-[20ch] max-w-[20ch]' style={{ zIndex: 1 }}>
+                                                            <div className='flex flex-row items-center gap-3 w-full'>
+                                                                <div className="me-auto">{user.name}</div>
+                                                                {
+                                                                    (user.host == true) ?
+                                                                    <div className='flex flex-row items-center gap-1'>
+                                                                        <div>GM</div>
+                                                                        <FontAwesomeIcon icon={faHatWizard}/>
+                                                                    </div>
+                                                                    : null
+                                                                }
+                                                                { pollData.auxInfoCodes.includes(auxInfoEnum.firstTimer) && (user.auxInfo[auxInfoEnum.firstTimer] ?? false) ?
+                                                                        <FontAwesomeIcon icon={faLeaf} className="text-green-600" />
+                                                                    : null
+                                                                }
+                                                                {
+                                                                    (selectedUser.id == -1) ?
+                                                                    <Fragment>
+                                                                        <FontAwesomeIcon className="cursor-pointer" icon={faPenToSquare} onClick={() => login(user.name, user.id)}/>
+                                                                    </Fragment>
+                                                                    : ((selectedUser.host) && (user.id !== selectedUser.id)) ?
+                                                                    <Fragment>
+                                                                        { pollData.auxInfoCodes.includes(auxInfoEnum.helpCharCreate) && (user.auxInfo[auxInfoEnum.helpCharCreate] ?? false) ?
+                                                                                <FontAwesomeIcon icon={faPersonChalkboard}/>
+                                                                            : null
+                                                                        }
+                                                                        {
+                                                                            (pollData.auxInfo.length > 0) ?
+                                                                            <FontAwesomeIcon className="cursor-pointer" icon={faCircleInfo} onClick={() => setAuxInfoModal({
+                                                                                show: true,
+                                                                                name: user.name,
+                                                                                auxInfo: {
+                                                                                    [auxInfoEnum.discordHandle]: user.auxInfo[auxInfoEnum.discordHandle] ?? "",
+                                                                                    [auxInfoEnum.veils]: user.auxInfo[auxInfoEnum.veils] ?? "",
+                                                                                    [auxInfoEnum.lines]: user.auxInfo[auxInfoEnum.lines] ?? "",
+                                                                                }
+                                                                            })}/>
+                                                                            : null
+                                                                        }
+                                                                        <FontAwesomeIcon className="cursor-pointer text-red-500" icon={faTrash} onClick={() => deleteUser(user.name, user.id)}/>
+                                                                    </Fragment>
+                                                                    : null
+                                                                }
+                                                            </div>
+                                                        </th>
+                                                        { Array.from(Array(24*2).keys()).map((idx2) => {
+                                                            const dateKey = date + "-" + idx2.toString();
+                                                            let attType = "open";
+
+                                                            if (hostClosed.includes(dateKey)) {
+                                                                attType = "closed";
+                                                            } else if (dateKey in user.attendance) {
+                                                                if (user.attendance[dateKey]) {
+                                                                    attType = "preferred";
+                                                                } else {
+                                                                    attType = "closed";
+                                                                }
+                                                            }
+
+                                                            if ((selectedUser.id == user.id) && ((!hostClosed.includes(dateKey)) || (selectedUser.host))) {
+                                                                return <td 
+                                                                    key={idx + "-" + date + '-' + idx2} className={attType} onMouseUp={mouseLeave}
+                                                                    onMouseDown={() => mouseDown(date, idx2)} onMouseEnter={() => mouseEnter(date, idx2)}
+                                                                ></td>;
+                                                            } else {
+                                                                return <td 
+                                                                    key={idx + "-" + date + '-' + idx2} className={attType} onMouseUp={mouseLeave}
+                                                                ></td>;
+                                                            }                                                
+                                                        })}
+                                                    </tr>
+                                                ))}
+                                            </Fragment>
+                                        )}
+                                    </tbody>
+                                </table>
+                                : null
+                            }
                         </div>
                     </div>
                     {

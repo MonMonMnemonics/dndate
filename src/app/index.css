@@ -94,3 +94,9 @@ table.poll {
 .closed {
   background-color:  #7C8491;
 }
+
+.date-header {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  font-size: x-large;
+}
