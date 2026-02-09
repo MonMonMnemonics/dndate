@@ -95,7 +95,19 @@ export function Poll() {
         }
 
         const data = await res.json();
-        setPollData({...pollData, ...data.pollData});
+        setPollData(data.pollData);
+
+        const auxInfoCodes = (data.pollData.auxInfo ?? []).map((e : any) => e.code);
+        data.userData = data.userData.map((dt: any) => {
+            for (const code of auxInfoCodes) {
+                if (!(code in dt.auxInfo)) {
+                    dt.auxInfo[code] = "";
+                }
+            }
+
+            return dt;
+        });
+
         setUserData(data.userData);
 
         if ((data.firstSetup ?? false) == true) {
@@ -596,9 +608,22 @@ export function Poll() {
         )
     }
 
+    //-------------------------- AUX INFO MODAL --------------------------
+    const [ auxInfoModal, setAuxInfoModal ] = useState<{
+        show: boolean,
+        name: string,
+        auxInfo: {[index:string]: string}
+    }>({
+        show: false,
+        name: "",
+        auxInfo: {}
+    })
+
     return (
         <div className="flex flex-col w-screen h-screen p-3 gap-3">
-            { loading && 
+            
+            { //-------------------------- LOADING MODAL --------------------------
+                loading && 
                 <div className="fixed h-full w-full z-20 flex flex-row">
                     <div className="bg-black opacity-40 fixed h-full w-full z-21"></div>
                     <div className="mx-auto flex flex-col">
@@ -612,7 +637,48 @@ export function Poll() {
                 </div>
             }
 
-            { newModal.show && 
+            { //-------------------------- INFO MODAL --------------------------
+                auxInfoModal.show && 
+                <div className="fixed h-full w-full z-10 flex flex-row">
+                    <div className="bg-black opacity-40 fixed h-full w-full z-11" onClick={() => setAuxInfoModal({...auxInfoModal, show: false})}></div>
+                    <div className="mx-auto flex flex-col">
+                        <div className="my-auto rounded-lg p-8 border border-black bg-dark-secondary z-12 flex flex-col font-bold gap-2 w-[30em]">
+                            <div className="w-full text-center align-middle text-2xl">
+                                {auxInfoModal.name}
+                            </div>
+                            <hr className="h-px my-2 bg-white border-0"/>
+                            <div className="flex flex-col gap-2 items-center w-full">
+                                <div className="text-nowrap text-xl">Veils:</div>
+                                <textarea
+                                    value={auxInfoModal.auxInfo[auxInfoEnum.veils]}
+                                    placeholder="None"
+                                    className="dark-input w-full p-2 rounded border font-light resize-none h-[7em]"
+                                    readOnly={true}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-2 items-center w-full">
+                                <div className="text-nowrap text-xl">Lines:</div>
+                                <textarea
+                                    value={auxInfoModal.auxInfo[auxInfoEnum.lines]}
+                                    placeholder="None"
+                                    className="dark-input w-full p-2 rounded border font-light resize-none h-[7em]"
+                                    readOnly={true}
+                                />
+                            </div>
+                            <div className="flex flex-row items-center justify-center w- full">
+                                <button className="bg-blue-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center text-xl"
+                                    onClick={() => setAuxInfoModal({...auxInfoModal, show: false})}
+                                >
+                                    <div className="font-bold">OK</div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            { //-------------------------- NEW MODAL --------------------------
+                newModal.show && 
                 <div className="fixed h-full w-full z-10 flex flex-row">
                     <div className="bg-black opacity-40 fixed h-full w-full z-11" onClick={() => setNewModal({...newModal, show: false})}></div>
                     <form className="mx-auto flex flex-col">
@@ -870,7 +936,14 @@ export function Poll() {
                                                         <Fragment>
                                                             {
                                                                 (pollData.auxInfo.length > 0) ?
-                                                                <FontAwesomeIcon className="cursor-pointer" icon={faCircleInfo} onClick={() => {}}/>
+                                                                <FontAwesomeIcon className="cursor-pointer" icon={faCircleInfo} onClick={() => setAuxInfoModal({
+                                                                    show: true,
+                                                                    name: user.name,
+                                                                    auxInfo: {
+                                                                        [auxInfoEnum.veils]: user.auxInfo[auxInfoEnum.veils] ?? "",
+                                                                        [auxInfoEnum.lines]: user.auxInfo[auxInfoEnum.lines] ?? "",
+                                                                    }
+                                                                })}/>
                                                                 : null
                                                             }
                                                             <FontAwesomeIcon className="cursor-pointer text-red-500" icon={faTrash} onClick={() => deleteUser(user.name, user.id)}/>
@@ -998,7 +1071,7 @@ export function Poll() {
                                                 case (auxInfoEnum.lines):
                                                     return (
                                                         <div className="flex flex-col gap-1 w-full" key={"input-" + infoDt.code}>
-                                                            <div className="font-bold">Lines (subjects you absolute don't want to talk about):</div>
+                                                            <div className="font-bold">Lines (subjects you absolutely don't want to come across):</div>
                                                            <textarea
                                                                 value={selectedUser.auxInfo[infoDt.code]}
                                                                 onChange={(e) => setSelectedUser({...selectedUser, auxInfo: {...selectedUser.auxInfo, [auxInfoEnum.lines]: e.target.value}})}

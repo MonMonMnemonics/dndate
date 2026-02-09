@@ -265,7 +265,7 @@ API.post("poll/data", async (ctx) => {
 
     const auxInfos = await db.select({
             infoId: userInfo.infoId,
-            userId: userInfo.id,
+            userId: userInfo.userId,
             val: userInfo.val
         })
         .from(userInfo)
@@ -273,6 +273,7 @@ API.post("poll/data", async (ctx) => {
             inArray(userInfo.userId, users.map(e => e.id)),
             inArray(userInfo.infoId, pollData.auxInfo.map((e: any) => e.id))
         ))
+    
     for (const auxDt of auxInfos) {
         if ((auxDt.infoId) && (auxDt.userId)) {
             const userId = auxDt.userId.toString();
@@ -328,9 +329,9 @@ API.post("poll/data", async (ctx) => {
 API.use("poll/save", async (ctx, next) => checkAuth(ctx, next));
 API.post("poll/save", async (ctx) => {
     const reqData = await ctx.req.json();
+    const pollData = ctx.get("pollData");
+    const userData = ctx.get("userData");
 
-    let userData: any = await db.select().from(user).where(eq(user.id, reqData.userData.id)).limit(1);
-    userData = userData[0];
 
     let newAttData: {userId: number, date: string, timeslot:number, val: boolean}[] = [];
     for (const dateKey in (reqData.attData ?? {})) {
@@ -347,7 +348,7 @@ API.post("poll/save", async (ctx) => {
         await db.insert(attendance).values(newAttData);
     }
 
-    const infoMapData = await db.select({ id:auxInfo.id, code:auxInfo.code }).from(auxInfo).where(eq(auxInfo.pollId, userData.pollId));
+    const infoMapData = await db.select({ id:auxInfo.id, code:auxInfo.code }).from(auxInfo).where(eq(auxInfo.pollId, pollData.id));
     let infoMap : {[index:string]: number} = {};
     for (const dt of infoMapData) {
         if (dt.code) {
@@ -358,7 +359,7 @@ API.post("poll/save", async (ctx) => {
     await db.delete(userInfo).where(eq(userInfo.userId, reqData.userData.id ?? -1));
     let newInfoData: {userId: number, infoId: number, val:string}[] = [];
     for (const code in (reqData.userData.auxInfo ?? {})) {
-        if (code in infoMapData) {
+        if (code in infoMap) {
             let val:any = null;
 
             switch (code) {
@@ -390,15 +391,15 @@ API.post("poll/save", async (ctx) => {
                 newInfoData.push({
                     userId: reqData.userData.id,
                     //@ts-expect-error
-                    infoId: infoMapData[code],
+                    infoId: infoMap[code],
                     val: val
                 });
             }
         }
+    }
 
-        if (newInfoData.length > 0) {
-            await db.insert(userInfo).values(newInfoData);
-        }
+    if (newInfoData.length > 0) {
+        await db.insert(userInfo).values(newInfoData);
     }
 
     return ctx.text("SAVED!");
