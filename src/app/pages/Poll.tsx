@@ -32,6 +32,7 @@ interface PollData {
         id: number,
         code: string
     }[]
+    auxInfoCodes: string[]
 }
 
 export function Poll() {
@@ -45,8 +46,9 @@ export function Poll() {
         dateEnd: moment().format("YYYY-MM-DD"),
         timezone: "GMT +00:00",
         open: true,
-        auxInfo: []
-    })
+        auxInfo: [],
+        auxInfoCodes: []
+    });
     const [ dates, setDates ] = useState<string[]>([]);
     const [ userData, setUserData ] = useState<UserData[]>([]);
 
@@ -76,7 +78,7 @@ export function Poll() {
             },
             body: JSON.stringify({
                 token: token,
-                ott: (window.sessionStorage.getItem("OTT-" + token) ?? "")
+                ott: (window.sessionStorage.getItem("OTT-" + token) ?? ""),
             })
         })
 
@@ -95,9 +97,8 @@ export function Poll() {
         }
 
         const data = await res.json();
-        setPollData(data.pollData);
-
         const auxInfoCodes = (data.pollData.auxInfo ?? []).map((e : any) => e.code);
+        data.pollData.auxInfoCodes = auxInfoCodes;
         data.userData = data.userData.map((dt: any) => {
             for (const code of auxInfoCodes) {
                 if (!(code in dt.auxInfo)) {
@@ -108,6 +109,7 @@ export function Poll() {
             return dt;
         });
 
+        setPollData(data.pollData);
         setUserData(data.userData);
 
         if ((data.firstSetup ?? false) == true) {
@@ -471,7 +473,19 @@ export function Poll() {
             return;
         }
 
-        const userDt = userData.find(e => e.id === userId);
+        const data = await res.json();
+        const updatedUserData = userData.map(dt => {
+            if (dt.id.toString() in data) {
+                dt.auxInfo = {
+                    ...dt.auxInfo,
+                    ...data[dt.id.toString()]
+                }
+            }
+            return dt;
+        })
+        setUserData(updatedUserData);
+
+        const userDt = updatedUserData.find(e => e.id === userId);
         if (userDt)  {
             setSelectedUser({
                 id: userId,
@@ -481,6 +495,7 @@ export function Poll() {
                 auxInfo: userDt.auxInfo
             });
         }
+
     }
 
     async function save() {
@@ -585,6 +600,17 @@ export function Poll() {
         setNewModal({...newModal, show:false});
     }
 
+    //-------------------------- AUX INFO MODAL --------------------------
+    const [ auxInfoModal, setAuxInfoModal ] = useState<{
+        show: boolean,
+        name: string,
+        auxInfo: {[index:string]: string}
+    }>({
+        show: false,
+        name: "",
+        auxInfo: {}
+    })
+
     if (!pollExist) {
         return (
             <div className="flex flex-col w-screen h-screen p-3 gap-3">
@@ -607,17 +633,6 @@ export function Poll() {
             </div>
         )
     }
-
-    //-------------------------- AUX INFO MODAL --------------------------
-    const [ auxInfoModal, setAuxInfoModal ] = useState<{
-        show: boolean,
-        name: string,
-        auxInfo: {[index:string]: string}
-    }>({
-        show: false,
-        name: "",
-        auxInfo: {}
-    })
 
     return (
         <div className="flex flex-col w-screen h-screen p-3 gap-3">
@@ -1002,9 +1017,9 @@ export function Poll() {
                                                                 type="text"
                                                                 value={selectedUser.auxInfo[infoDt.code]}
                                                                 onChange={(e) => setSelectedUser({...selectedUser, auxInfo: {...selectedUser.auxInfo, [auxInfoEnum.discordHandle]: e.target.value}})}
-                                                                placeholder="Username..."
+                                                                placeholder="Discord name..."
                                                                 className="dark-input w-full p-2 rounded border font-light"
-                                                                maxLength={20}
+                                                                maxLength={50}
                                                             />
                                                         </div>
                                                     )
@@ -1062,8 +1077,9 @@ export function Poll() {
                                                            <textarea
                                                                 value={selectedUser.auxInfo[infoDt.code]}
                                                                 onChange={(e) => setSelectedUser({...selectedUser, auxInfo: {...selectedUser.auxInfo, [auxInfoEnum.veils]: e.target.value}})}
-                                                                placeholder="Veils..."
+                                                                placeholder="None"
                                                                 className="dark-input w-full p-2 rounded border font-light resize-none h-[5em]"
+                                                                maxLength={400}
                                                             />
                                                         </div>
                                                     )
@@ -1075,8 +1091,9 @@ export function Poll() {
                                                            <textarea
                                                                 value={selectedUser.auxInfo[infoDt.code]}
                                                                 onChange={(e) => setSelectedUser({...selectedUser, auxInfo: {...selectedUser.auxInfo, [auxInfoEnum.lines]: e.target.value}})}
-                                                                placeholder="Lines..."
+                                                                placeholder="None"
                                                                 className="dark-input w-full p-2 rounded border font-light resize-none h-[5em]"
+                                                                maxLength={400}
                                                             />
                                                         </div>
                                                     )

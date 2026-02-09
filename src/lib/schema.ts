@@ -40,7 +40,7 @@ export const attendance = sqliteTable("attendance", {
 export const auxInfo = sqliteTable("aux_info", {
     id: integer("id").primaryKey(),
     pollId: integer("poll_id").references(() => poll.id, { onDelete: "cascade" }),
-    code: text("code").default("CUSTOM"),
+    code: text("code").default("CUSTOM").notNull(),
     type: text("type", { enum:["TEXT", "NMBR", "BOOL"]}),
     title: text("title").default("").notNull(),
     description: text("description").default(""),

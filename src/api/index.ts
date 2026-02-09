@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { db } from "../lib/database";
 import { poll, user, auxInfo, attendance, userInfo } from "../lib/schema";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, notInArray } from "drizzle-orm";
 import moment from "moment";
 import type { UserData } from "@/common/types";
 import { createMiddleware } from "hono/factory";
@@ -15,6 +15,34 @@ const API = new Hono<{
     },
 }>();
 const tempToken: {[key: string]: number} = {};
+
+//-------------------------- HELPERS --------------------------
+function convertInfoVal(code: string, val: string):any {
+    switch (code) {
+        case (auxInfoEnum.firstTimer): {
+            if (val.toUpperCase() == "TRUE") {
+                return true;
+            } else if (val.toUpperCase() == "FALSE") { 
+                return false;
+            }
+            break;
+        }
+
+        case (auxInfoEnum.helpCharCreate): {
+            if (val.toUpperCase() == "TRUE") {
+                return true;
+            } else if (val.toUpperCase() == "FALSE") { 
+                return false;
+            }
+            break;
+        }
+    
+        default: {
+            return val;
+        }                        
+    }
+}
+
 
 //-------------------------- MIDDLEWARE --------------------------
 type AuthPollData = {
@@ -137,7 +165,11 @@ API.post("poll/login", async (ctx) => {
     const reqData = await ctx.req.json();
     const pass = Bun.SHA512.hash(Bun.env.APP_ID + reqData.pass, "hex");
 
-    let userData: any = await db.select()
+    let userData: any = await db.select({
+            id: user.id,
+            host: user.host,
+            pollId: user.pollId
+        })
         .from(user)
         .leftJoin(poll, eq(user.pollId, poll.id))
         .where(and(
@@ -152,7 +184,48 @@ API.post("poll/login", async (ctx) => {
         return ctx.text("USER NOT FOUND");
     }
 
-    return ctx.text('OK!');
+    let privateAuxInfoList: {[index: string]: {[index:string]: string}} = {};
+    if (userData[0].host ?? false) {
+        const auxInfos = await db.select({
+                userId: userInfo.userId,
+                code: auxInfo.code,
+                val: userInfo.val
+            })
+            .from(userInfo)
+            .leftJoin(auxInfo, eq(userInfo.infoId, auxInfo.id))
+            .where(eq(auxInfo.pollId, userData[0].pollId))
+        
+        for (const infoDt of auxInfos) {
+            const userId = (infoDt.userId ?? -1).toString();
+            if (!(userId in privateAuxInfoList)) {
+                privateAuxInfoList[userId] = {};
+            }
+
+            //@ts-expect-error
+            privateAuxInfoList[userId][infoDt.code] = convertInfoVal(infoDt.code, infoDt.val);
+        }
+    } else {
+        const auxInfos = await db.select({
+                userId: userInfo.userId,
+                code: auxInfo.code,
+                val: userInfo.val
+            })
+            .from(userInfo)
+            .leftJoin(auxInfo, eq(userInfo.infoId, auxInfo.id))
+            .where(eq(userInfo.userId, userData[0].id));
+
+        for (const infoDt of auxInfos) {
+            const userId = (infoDt.userId ?? -1).toString();
+            if (!(userId in privateAuxInfoList)) {
+                privateAuxInfoList[userId] = {};
+            }
+
+            //@ts-expect-error
+            privateAuxInfoList[userId][infoDt.code] = convertInfoVal(infoDt.code, infoDt.val);
+        }
+    }
+
+    return ctx.json(privateAuxInfoList);
 });
 
 API.post("poll/create-user", async (ctx) => {
@@ -229,8 +302,7 @@ API.post("poll/data", async (ctx) => {
     let auxInfoMap : {[index: string]: string} = {};
     for (const infoDt of pollData.auxInfo) {
         auxInfoMap[infoDt.id.toString()] = infoDt.code;
-    }
-    
+    }    
 
     const users = await db.select()
         .from(user)
@@ -269,40 +341,19 @@ API.post("poll/data", async (ctx) => {
             val: userInfo.val
         })
         .from(userInfo)
+        .leftJoin(auxInfo, eq(userInfo.infoId, auxInfo.id))
         .where(and(
             inArray(userInfo.userId, users.map(e => e.id)),
-            inArray(userInfo.infoId, pollData.auxInfo.map((e: any) => e.id))
-        ))
-    
+            inArray(userInfo.infoId, pollData.auxInfo.map((e: any) => e.id)),
+            firstSetup ? undefined : notInArray(auxInfo.code, [auxInfoEnum.veils, auxInfoEnum.lines, auxInfoEnum.discordHandle])
+        ));
+
     for (const auxDt of auxInfos) {
         if ((auxDt.infoId) && (auxDt.userId)) {
             const userId = auxDt.userId.toString();
             const infoId = auxDt.infoId.toString();
             if ((userData[userId]) && (auxInfoMap[infoId])) {
-                switch (auxInfoMap[infoId]) {
-                    case (auxInfoEnum.firstTimer): {
-                        if (auxDt.val?.toUpperCase() == "TRUE") {
-                            userData[userId].auxInfo[auxInfoMap[infoId]] = true;
-                        } else if (auxDt.val?.toUpperCase() == "FALSE") { 
-                            userData[userId].auxInfo[auxInfoMap[infoId]] = false;
-                        }
-                        break;
-                    }
-
-                    case (auxInfoEnum.helpCharCreate): {
-                        if (auxDt.val?.toUpperCase() == "TRUE") {
-                            userData[userId].auxInfo[auxInfoMap[infoId]] = true;
-                        } else if (auxDt.val?.toUpperCase() == "FALSE") { 
-                            userData[userId].auxInfo[auxInfoMap[infoId]] = false;
-                        }
-                        break;
-                    }
-                
-                    default: {
-                        userData[userId].auxInfo[auxInfoMap[infoId]] = auxDt.val;
-                        break;
-                    }                        
-                }
+                userData[userId].auxInfo[auxInfoMap[infoId]] = convertInfoVal(auxInfoMap[infoId], auxDt.val ?? "");
             }
         }
     }
@@ -330,8 +381,6 @@ API.use("poll/save", async (ctx, next) => checkAuth(ctx, next));
 API.post("poll/save", async (ctx) => {
     const reqData = await ctx.req.json();
     const pollData = ctx.get("pollData");
-    const userData = ctx.get("userData");
-
 
     let newAttData: {userId: number, date: string, timeslot:number, val: boolean}[] = [];
     for (const dateKey in (reqData.attData ?? {})) {
