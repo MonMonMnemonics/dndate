@@ -234,12 +234,18 @@ API.post("poll/create-user", async (ctx) => {
 
     let pollData : any = await db.select({
             id: poll.id,
+            open: poll.open
         })
         .from(poll)
         .where(eq(poll.token, reqData.token))
         .limit(1);
     
     if (pollData.length < 1) {
+        ctx.status(418);
+        return ctx.text('AM A TEAPOT XD');
+    }
+
+    if (!pollData[0].open) {
         ctx.status(418);
         return ctx.text('AM A TEAPOT XD');
     }

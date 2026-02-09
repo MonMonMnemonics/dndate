@@ -4,7 +4,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import type { UserData } from "@/common/types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBan, faCircleInfo, faFloppyDisk, faHatWizard, faHouse, faInfoCircle, faLeaf, faLockOpen, faPenToSquare, faPersonChalkboard, faPlus, faQuestionCircle, faSpinner, faTrash, faUser, faUserPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faBan, faCircleInfo, faDiceD20, faFloppyDisk, faHatWizard, faHouse, faInfoCircle, faLeaf, faLockOpen, faMaximize, faMinimize, faPenToSquare, faPersonChalkboard, faPlus, faQuestionCircle, faSpinner, faTrash, faUser, faUserPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { auxInfoEnum } from "@/common/consts";
 
 interface NewModal {
@@ -39,7 +39,8 @@ export function Poll() {
     const { token } = useParams();
     const [ searchParams ] = useSearchParams();
     const [ pollExist, setPollExist ] = useState(true);
-    const [ pollStyle, setPollStyle ] = useState("HORIZONTAL");
+    const [ pollStyle, setPollStyle ] = useState("VERTICAL");
+    const [ fullView, setFullView ] = useState(false);
 
     const [ pollData, setPollData ] = useState<PollData>({
         title: "POLL",
@@ -56,8 +57,8 @@ export function Poll() {
 
     useEffect(() => {
         getPollData();
-        if ((searchParams.get("style") ?? "A") == "B") {
-            setPollStyle("VERTICAL");
+        if ((searchParams.get("style") ?? "A").toUpperCase() == "B") {
+            setPollStyle("HORIZONTAL");
         }
     }, []);
 
@@ -780,7 +781,7 @@ export function Poll() {
                     </form>
                 </div>
             }
-            <div className="bg-dark-secondary rounded-lg p-3 border border-gray-500 text-dark-text flex flex-col gap-2 h-[33%]">
+            <div className={"bg-dark-secondary rounded-lg p-3 border border-gray-500 text-dark-text flex flex-col gap-2" + ((fullView) ? "" :  " h-[33%]")}>
                 <div className="flex flex-row">
                     <button className="dark-button p-1 text-2xl rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center"
                         onClick={() => {window.location.href = "/"}} type="button"
@@ -801,65 +802,70 @@ export function Poll() {
                         : null
                     }
                 </div>
-                <hr className="h-px my-2 bg-white border-0"/>
-                <div className="grow flex flex-row gap-2">
-                    <div className="h-full w-[30em] flex flex-col gap-3">
-                        <div className="flex flex-row items-center">
-                            <div className="font-bold text-xl me-auto">Members</div>
-                            {
-                                ((selectedUser.id == -1) && (pollData.open)) ?
-                                <button className="bg-green-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center"
-                                    onClick={() => setNewModal({
-                                        show: true,
-                                        name: "",
-                                        pass: "",
-                                    })} type="button"
-                                >
-                                    <div className="font-bold">Join!</div>
-                                    <FontAwesomeIcon icon={faPlus} />
-                                </button>
-                                : null
-                            }
-                        </div>
-                        <div className="grow relative flex flex-col">
-                            <div className="h-full w-full absolute gap-2 overflow-y-auto px-2">
-                                <ul className="list-none font-bold">
+                {
+                    (!fullView) &&
+                    <Fragment>
+                        <hr className="h-px my-2 bg-white border-0"/>
+                        <div className="grow flex flex-row gap-2">
+                            <div className="h-full w-[30em] flex flex-col gap-3">
+                                <div className="flex flex-row items-center">
+                                    <div className="font-bold text-xl me-auto">Members</div>
                                     {
-                                        userData.map((user, idx) => (
-                                            <li key={'user-list-' + idx}><div className={"flex flex-row gap-2 items-center p-2 rounded border " + ((user.id === selectedUser.id) ? "bg-gray-700 border-green-500" : "border-gray-500")}>
-                                                <FontAwesomeIcon icon={faUser}/>
-                                                <div className="w-full">{user.name + (user.host ? " (GM)" : "")} </div>
-                                            </div></li>
-                                        ))
+                                        ((selectedUser.id == -1) && (pollData.open)) ?
+                                        <button className="bg-green-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center"
+                                            onClick={() => setNewModal({
+                                                show: true,
+                                                name: "",
+                                                pass: "",
+                                            })} type="button"
+                                        >
+                                            <div className="font-bold">Join!</div>
+                                            <FontAwesomeIcon icon={faPlus} />
+                                        </button>
+                                        : null
                                     }
-                                </ul>
+                                </div>
+                                <div className="grow relative flex flex-col">
+                                    <div className="h-full w-full absolute gap-2 overflow-y-auto px-2">
+                                        <ul className="list-none font-bold">
+                                            {
+                                                userData.map((user, idx) => (
+                                                    <li key={'user-list-' + idx}><div className={"flex flex-row gap-2 items-center p-2 rounded border " + ((user.id === selectedUser.id) ? "bg-gray-700 border-green-500" : "border-gray-500")}>
+                                                        <FontAwesomeIcon icon={faUser}/>
+                                                        <div className="w-full">{user.name + (user.host ? " (GM)" : "")} </div>
+                                                    </div></li>
+                                                ))
+                                            }
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                    <div className="w-px mx-2 bg-white border-0"/>
-                    <textarea
-                        value={pollData.description}
-                        placeholder="Description of the poll is here... If only the host provided one..."
-                        className="transparent-input w-full p-2 rounded border font-light resize-none grow"
-                        readOnly={true}
-                    />
-                    <div className="w-px mx-2 bg-white border-0"/>
-                    <div className="h-full w-[30em] flex flex-col gap-2">
-                        <div className="flex flex-row w-full justify-center items-center gap-3 font-bold text-2xl">
-                            <FontAwesomeIcon icon={faQuestionCircle}/>
-                            <div>Guide</div>
-                            <FontAwesomeIcon icon={faQuestionCircle}/>
-                        </div>
-                        <hr className="h-px bg-gray-600 border-0"/>
-                        <div className="grow px-3 font-bold text-sm">
-                            <ul className="list-disc">
-                                <li>Just click "Join" to add your data.</li>
-                                <li>Click pencil symbol next to your name in the table to edit your answer.</li>
-                                <li>Editing as the host allows you to see extra information submitted.</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
+                            <div className="w-px mx-2 bg-white border-0"/>
+                            <textarea
+                                value={pollData.description}
+                                placeholder="Description of the poll is here... If only the host provided one..."
+                                className="transparent-input w-full p-2 rounded border font-light resize-none grow"
+                                readOnly={true}
+                            />
+                            <div className="w-px mx-2 bg-white border-0"/>
+                            <div className="h-full w-[30em] flex flex-col gap-2">
+                                <div className="flex flex-row w-full justify-center items-center gap-3 font-bold text-2xl">
+                                    <FontAwesomeIcon icon={faQuestionCircle}/>
+                                    <div>Guide</div>
+                                    <FontAwesomeIcon icon={faQuestionCircle}/>
+                                </div>
+                                <hr className="h-px bg-gray-600 border-0"/>
+                                <div className="grow px-3 font-bold text-sm">
+                                    <ul className="list-disc">
+                                        <li>Just click "Join+" to add your name and fill in your availability.</li>
+                                        <li>Click pencil symbol next to your name in the table to edit your answer.</li>
+                                        <li>Editing as the host allows you to see extra information submitted.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>                        
+                    </Fragment>
+                }
             </div>
             <div className="bg-dark-secondary rounded-lg p-3 border border-gray-500 text-dark-text flex flex-col gap-2 grow">
                 <div className="flex flex-row justify-between items-center font-bold text-xl">
@@ -902,34 +908,43 @@ export function Poll() {
                             </div>                            
                         : null
                     }
-                    <div className="flex flex-col gap-2">
-                        <div className="flex flex-row items-center gap-6">
-                            <div className="flex flex-row items-center gap-2 select-none cursor-pointer" onClick={() => setBrushType(1)}>
-                                {
-                                    (selectedUser.id != -1) ? <input type="radio" checked={brushType == 1} readOnly/> : null
-                                }
-                                <div>Preferred</div>
-                                <div className="bg-white w-[2ch] h-[2ch] rounded-lg p-3 preferred"/>
+                    <div className="h-full flex flex-row items-center gap-5">
+                        <div className="flex flex-col gap-2">
+                            <div className="flex flex-row items-center gap-6">
+                                <div className="flex flex-row items-center gap-2 select-none cursor-pointer" onClick={() => setBrushType(1)}>
+                                    {
+                                        (selectedUser.id != -1) ? <input type="radio" checked={brushType == 1} readOnly/> : null
+                                    }
+                                    <div>Preferred</div>
+                                    <div className="bg-white w-[2ch] h-[2ch] rounded-lg p-3 preferred"/>
+                                </div>
+                                <div className="flex flex-row items-center gap-2 select-none cursor-pointer" onClick={() => setBrushType(0)}>
+                                    {
+                                        (selectedUser.id != -1) ? <input type="radio" checked={brushType == 0} readOnly/> : null
+                                    }
+                                    <div>Open</div>
+                                    <div className="bg-white w-[2ch] h-[2ch] rounded-lg p-3 open"/>
+                                </div>
+                                <div className="flex flex-row items-center gap-2 select-none cursor-pointer" onClick={() => setBrushType(-1)}>
+                                    {
+                                        (selectedUser.id != -1) ? <input type="radio" checked={brushType == -1} readOnly/> : null
+                                    }
+                                    <div>No</div>
+                                    <div className="bg-white w-[2ch] h-[2ch] rounded-lg p-3 closed"/>
+                                </div>
                             </div>
-                            <div className="flex flex-row items-center gap-2 select-none cursor-pointer" onClick={() => setBrushType(0)}>
-                                {
-                                    (selectedUser.id != -1) ? <input type="radio" checked={brushType == 0} readOnly/> : null
-                                }
-                                <div>Open</div>
-                                <div className="bg-white w-[2ch] h-[2ch] rounded-lg p-3 open"/>
-                            </div>
-                            <div className="flex flex-row items-center gap-2 select-none cursor-pointer" onClick={() => setBrushType(-1)}>
-                                {
-                                    (selectedUser.id != -1) ? <input type="radio" checked={brushType == -1} readOnly/> : null
-                                }
-                                <div>No</div>
-                                <div className="bg-white w-[2ch] h-[2ch] rounded-lg p-3 closed"/>
+                            <div className="text-sm h-[2ch]">
+                                {(selectedUser.id != -1) ? "Click and drag timeslot to fill" : ""
+                            }
                             </div>
                         </div>
-                        <div className="text-sm h-[2ch]">
-                            {(selectedUser.id != -1) ? "Click and drag timeslot to fill" : ""
-                        }
-                        </div>
+                        <button className="bg-dark rounded-xl border border-3 h-full aspect-square flex flex-col"
+                            onClick={() => setFullView(!fullView)}
+                        >
+                            <div className="flex my-auto flex-row">
+                                <FontAwesomeIcon icon={fullView ? faMinimize : faMaximize} className="mx-auto font-bold text-3xl"/>
+                            </div>
+                        </button>
                     </div>
                 </div>
                 <div className="flex flex-row text-sm font-bold items-center gap-4 px-2">
@@ -953,22 +968,24 @@ export function Poll() {
                 
                 <div className="grow flex flex-row gap-5">
                     <div className='relative grow select-none flex flex-col'>
-                        <div className="h-full w-full flex flex-col absolute overflow-auto m-2">
+                        <div className="h-full w-full flex flex-col absolute overflow-auto ms-2 pe-2 pb-2">
                             {
                                 (pollStyle == "HORIZONTAL") ?
-                                <table className='poll' style={{ width: 'auto' }}>
+                                <table className='poll me-2 horizontal' style={{ width: 'auto' }}>
                                     <thead className="sticky top-0" style={{ zIndex: 2 }}>
                                         <tr>
-                                            <th rowSpan={2} className='sticky left-0 top-0 align-middle text-center' style={{ zIndex: 2 }}>Name</th>
+                                            <th rowSpan={2} className='sticky left-0 top-0 align-middle text-center text-2xl' style={{ zIndex: 6 }}>Name</th>
                                             { dates.map(date => (
                                                 <th key={'header-' + date} className="date-header" colSpan={48}>{moment(date).format('YYYY-MM-DD (dddd)')}</th>
                                             ))}
                                         </tr>
                                         <tr>
-                                            { dates.map((date) => {
-                                                return Array.from(Array(24).keys()).map((timeslotIdx) => (
-                                                    <th key={date + "-" + timeslotIdx} className={"timeslot min-w-[6ch] ps-2 text-start " + (((timeslotIdx % 2) == 0) ? "even" : "odd")} colSpan={2}>
-                                                        {timeslotIdx}
+                                            { dates.map((date, dateIdx) => {
+                                                return Array.from(Array(24*2).keys()).map((timeslotIdx) => (
+                                                    <th key={date + "-" + timeslotIdx} style={{ height: '3ch' }}
+                                                        className={"timeslot horizontal relative min-w-[3.5ch] max-w-[3.5ch] text-start" + ((timeslotIdx % 2 == 0) ? " even" : " odd") + (((timeslotIdx == 0) && (dateIdx > 0)) ? " timeslotidx-0" : "")}
+                                                    >
+                                                        <div className="absolute ps-2 top-0 bg-dark" style={{ zIndex: 4 }}>{(timeslotIdx % 2 == 0) ? timeslotIdx/2 : ""}</div>                                                        
                                                     </th>
                                                 ))
                                             })}
@@ -976,8 +993,8 @@ export function Poll() {
                                     </thead>
                                     <tbody>
                                         {userData.map((user, idx) => (
-                                            <tr key={'tr-' + idx} style={{ height: '3em' }} onMouseLeave={mouseLeave}>
-                                                <th className='sticky text-nowrap left-0 align-middle px-3 min-w-[30ch]' style={{ zIndex: 1 }}>
+                                            <tr key={'tr-' + idx} style={{ height: '5ch' }} className={(user.id == selectedUser.id) ? "selected-row" : ""} onMouseLeave={mouseLeave}>
+                                                <th className='sticky text-nowrap left-0 align-middle px-3 min-w-[30ch] name-cell' style={{ zIndex: 1 }}>
                                                     <div className='flex flex-row items-center gap-3 w-full'>
                                                         <div className="me-auto">{user.name}</div>
                                                         {
@@ -1036,6 +1053,18 @@ export function Poll() {
                                                                 attType = "closed";
                                                             }
                                                         }
+                                                        
+                                                        if (idx2 % 2 == 0) {
+                                                            attType += " even";
+                                                        } else {
+                                                            attType += " odd";
+                                                        }
+
+                                                        if (idx2 == 0) {
+                                                            attType += " timeslotidx-0";
+                                                        } else if (idx2 == 47) {
+                                                            attType += " timeslotidx-47";
+                                                        }
 
                                                         if ((selectedUser.id == user.id) && ((!hostClosed.includes(dateKey)) || (selectedUser.host))) {
                                                             return <td 
@@ -1054,29 +1083,37 @@ export function Poll() {
                                     </tbody>
                                 </table>
                                 : (pollStyle == "VERTICAL") ?
-                                <table className='poll w-full' style={{ width: 'auto' }}>
+                                <table className='poll w-full vertical' style={{ width: 'auto' }}>
                                     <tbody>
-                                        {dates.map((date) => 
+                                        {dates.map((date, dateIdx) => 
                                             <Fragment key={'v-' + date}>
-                                                <tr><th colSpan={49} className="date-header">{moment(date).format('YYYY-MM-DD (dddd)')}</th></tr>
+                                                <tr><th colSpan={49} className={"date-header vertical" + ((dateIdx == 0) ? " first" : "")}>{moment(date).format('YYYY-MM-DD (dddd)')}</th></tr>
                                                 <tr>
-                                                    <th></th>
-                                                    { Array.from(Array(24).keys()).map((timeslotIdx) => (
-                                                        <th key={date + "-" + timeslotIdx} className={"timeslot ps-2 text-start " + (((timeslotIdx % 2) == 0) ? "even" : "odd")} colSpan={2}>
-                                                            {timeslotIdx}
+                                                    <th className="sticky left-0 left-border" style={{ zIndex:6 }}></th>
+                                                    { Array.from(Array(24*2).keys()).map((timeslotIdx) => (
+                                                        <th key={date + "-" + timeslotIdx} style={{ height: "4ch"}}
+                                                            className={"timeslot horizontal relative text-start" 
+                                                                + ((timeslotIdx % 2 == 0) ? " even" : " odd") 
+                                                                + ((timeslotIdx == 0) ? " timeslotidx-0" : (timeslotIdx == 47) ? " timeslotidx-47" : "")
+                                                                + " min-w-[3.5ch] max-w-[3.5ch]"
+                                                            }
+                                                        >
+                                                            <div className="absolute ps-2 pb-1 bottom-0 bg-dark" style={{ zIndex: 4 }}>{(timeslotIdx % 2 == 0) ? timeslotIdx/2 : ""}</div>                                                        
                                                         </th>
                                                     ))}
                                                 </tr>
                                                 {userData.map((user, idx) => (
-                                                    <tr key={'tr-' + idx} style={{ height: '3em' }} onMouseLeave={mouseLeave}>
-                                                        <th className='sticky text-nowrap left-0 align-middle px-3 min-w-[20ch] max-w-[20ch]' style={{ zIndex: 1 }}>
+                                                    <tr key={'tr-' + idx} className={(user.id == selectedUser.id) ? "selected-row" : ""} style={{ height: '3em' }} onMouseLeave={mouseLeave}>
+                                                        <th className={'sticky text-nowrap left-0 align-middle px-3 w-[310px] left-border name-cell'
+                                                            + ((idx == userData.length - 1) ? " bottom-border" : "")
+                                                        } style={{ zIndex: 1 }}>
                                                             <div className='flex flex-row items-center gap-3 w-full'>
                                                                 <div className="me-auto">{user.name}</div>
                                                                 {
                                                                     (user.host == true) ?
                                                                     <div className='flex flex-row items-center gap-1'>
                                                                         <div>GM</div>
-                                                                        <FontAwesomeIcon icon={faHatWizard}/>
+                                                                        <FontAwesomeIcon icon={faDiceD20}/>
                                                                     </div>
                                                                     : null
                                                                 }
@@ -1128,6 +1165,18 @@ export function Poll() {
                                                                 }
                                                             }
 
+                                                            if (idx2 % 2 == 0) {
+                                                                attType += " even";
+                                                            } else {
+                                                                attType += " odd";
+                                                            }
+
+                                                            if (idx2 == 0) {
+                                                                attType += " timeslotidx-0";
+                                                            } else if (idx2 == 47) {
+                                                                attType += " timeslotidx-47";
+                                                            }
+
                                                             if ((selectedUser.id == user.id) && ((!hostClosed.includes(dateKey)) || (selectedUser.host))) {
                                                                 return <td 
                                                                     key={idx + "-" + date + '-' + idx2} className={attType} onMouseUp={mouseLeave}
@@ -1150,7 +1199,7 @@ export function Poll() {
                         </div>
                     </div>
                     {
-                        ((pollData.auxInfo.length > 0) && (selectedUser.id != -1) && (!selectedUser.host)) ?
+                        ((pollData.auxInfo.length > 0) && (selectedUser.id != -1) && (!selectedUser.host) && (!fullView)) ?
                         <Fragment>
                             <div className="w-px ms-2 bg-white border-0"/>
                             <div className='relative flex flex-col w-[20em]'>
@@ -1227,7 +1276,7 @@ export function Poll() {
                                                                 value={selectedUser.auxInfo[infoDt.code]}
                                                                 onChange={(e) => setSelectedUser({...selectedUser, auxInfo: {...selectedUser.auxInfo, [auxInfoEnum.veils]: e.target.value}})}
                                                                 placeholder="None"
-                                                                className="dark-input w-full p-2 rounded border font-light resize-none h-[5em]"
+                                                                className="dark-input w-full p-2 rounded border font-light resize-none h-[4em]"
                                                                 maxLength={400}
                                                             />
                                                         </div>
@@ -1241,7 +1290,7 @@ export function Poll() {
                                                                 value={selectedUser.auxInfo[infoDt.code]}
                                                                 onChange={(e) => setSelectedUser({...selectedUser, auxInfo: {...selectedUser.auxInfo, [auxInfoEnum.lines]: e.target.value}})}
                                                                 placeholder="None"
-                                                                className="dark-input w-full p-2 rounded border font-light resize-none h-[5em]"
+                                                                className="dark-input w-full p-2 rounded border font-light resize-none h-[4em]"
                                                                 maxLength={400}
                                                             />
                                                         </div>

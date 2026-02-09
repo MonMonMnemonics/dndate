@@ -74,12 +74,82 @@ button {
 }
 
 table.poll {
+  .date-header {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: x-large;
+  }
+
   th {
     background-color: #1a1a1a;
   }
 
+  th.timeslot.even {
+    border-left: 1px solid #F2F3F4;
+  }
+
   td {
     cursor: pointer;
+    border-top: 1px solid #F2F3F4;
+    border-bottom: 1px solid #F2F3F4;
+  }
+
+  td.odd {
+    border-left: 1px dashed #F2F3F4;
+  }
+
+  td.even {
+    border-left: 1px solid #F2F3F4;
+  }
+
+  /*------------- SELECTED -------------*/
+  tr.selected-row {
+    td {
+      border-top: 3px solid #00e65c;
+      border-bottom: 3px solid #00e65c;
+    }
+
+    th.name-cell {
+      border-top: 3px solid #00e65c;
+      border-bottom: 3px solid #00e65c;
+    }
+  }
+}
+
+table.poll.vertical {
+  th.date-header {
+    border-top: 3px solid #F2F3F4;
+    border-bottom: 3px solid #F2F3F4;
+  }
+
+  th.date-header.first {
+    border-top: none;
+  }
+
+  th.timeslot.horizontal.timeslotidx-47 {
+    border-right: 1px solid #F2F3F4;
+  }
+
+  td.timeslotidx-47 {
+    border-right: 1px solid #F2F3F4;
+  }
+
+  th.left-border {
+    border-left: 1px solid #F2F3F4;
+  }
+
+  th.name-cell.bottom-border {
+    border-bottom: 1px solid #F2F3F4;
+  }
+}
+
+table.poll.horizontal {
+  td.timeslotidx-0 {
+    border-left: 5px solid #F2F3F4;
+  }
+
+  th.timeslot.horizontal.timeslotidx-0 {
+    border-left: 5px solid #F2F3F4;
   }
 }
 
@@ -93,10 +163,4 @@ table.poll {
 
 .closed {
   background-color:  #7C8491;
-}
-
-.date-header {
-  padding-top: 10px;
-  padding-bottom: 10px;
-  font-size: x-large;
 }
