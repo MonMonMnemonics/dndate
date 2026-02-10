@@ -4,11 +4,10 @@ import { useParams, useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import type { UserData, SelectedUser, PollData } from "@/common/types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBan, faFloppyDisk, faHouse, faInfoCircle, faLeaf, faLockOpen, faMaximize, faMinimize, faPersonChalkboard, faPlus, faQuestionCircle, faSpinner, faUser, faUserPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faBan, faFloppyDisk, faHouse, faInfoCircle, faLeaf, faLockOpen, faMaximize, faMinimize, faPersonChalkboard, faPlus, faQuestionCircle, faSpinner, faUser, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { auxInfoEnum } from "@/common/consts";
 import { ScheduleTable } from "../components/ScheduleTable";
 import { UserInfoModal } from "../components/UserInfoModal";
-import { AuxInfoEditModal } from "../components/AuxInfoEditModal";
 
 interface UserModal {
     show: boolean,
@@ -333,7 +332,43 @@ export function Poll() {
         }
     }
 
-    async function login(userId: number, pass: string) {
+    async function login(userName: string, userId: number) {
+        const swConf = await Swal.fire({
+            title: "Login",
+            theme: 'dark',
+            input: "password",
+            inputPlaceholder: "password...",
+            inputLabel: "Password",
+            inputAttributes: {
+                autocapitalize: "off",
+                autocorrect: "off"
+            },
+            text: "Login password for username " + userName,
+            showCancelButton: true,
+            focusConfirm: false,
+            reverseButtons: true,
+            confirmButtonText: "Login",
+            cancelButtonText: "Cancel",
+            inputValidator: (val) => {
+                if (!val) {
+                    return "Please fill in password";
+                }
+            }
+        })
+
+        if (!swConf.isConfirmed) {
+            return;
+        }
+
+        if (failCheck >= 3) {
+            Swal.fire({
+                title: "Login failed",
+                theme: 'dark',
+                icon: "error",
+                text: "Make sure you choose the right user and enter the right password"
+            });
+        }
+
         setLoading(true);
         const res = await fetch("/api/poll/login", {
             method: "POST",
@@ -343,7 +378,7 @@ export function Poll() {
             body: JSON.stringify({
                 token: token,
                 userId: userId,
-                pass: pass,
+                pass: swConf.value,
             })
         });
         setLoading(false);
@@ -384,7 +419,7 @@ export function Poll() {
                 id: userId,
                 host: userDt.host ?? false,
                 auth: "PASS",
-                key: pass,
+                key: swConf.value,
                 auxInfo: userDt.auxInfo
             });
             setBrushType(1);
@@ -576,8 +611,6 @@ export function Poll() {
         auxInfo: {}
     })
 
-    const [ showAuxInfoEditModal, setShowAuxInfoEditModal ] = useState(false);
-
     if (!pollExist) {
         return (
             <div className="flex flex-col w-screen h-screen p-3 gap-3">
@@ -687,17 +720,6 @@ export function Poll() {
                 auxInfo={pollData.auxInfo}
                 submitData={(data) => (UserModal.editMode) ? submitInfoChange(data.auxInfo ?? {}) : submitNewUser(data)}
                 initData={UserModal.initData}                
-            />
-
-            <AuxInfoEditModal
-                show={showAuxInfoEditModal}
-                auxInfo={pollData.auxInfo}
-                initData={selectedUser.auxInfo}
-                closeModal={() => setShowAuxInfoEditModal(false)}
-                saveData={(newAuxInfo) => {
-                    setShowAuxInfoEditModal(false);
-                    setSelectedUser({...selectedUser, auxInfo: newAuxInfo});
-                }}
             />
 
             <div className={"bg-dark-secondary rounded-lg p-3 border border-gray-500 text-dark-text flex flex-col gap-2" + ((fullView) ? "" :  " h-[33%]")}>
@@ -912,45 +934,7 @@ export function Poll() {
                         activeUserId={selectedUser.id}
                         isHost={selectedUser.host}
 
-                        login={async (userName: string, userId: number) => {
-                                const swConf = await Swal.fire({
-                                    title: "Login",
-                                    theme: 'dark',
-                                    input: "password",
-                                    inputPlaceholder: "password...",
-                                    inputLabel: "Password",
-                                    inputAttributes: {
-                                        autocapitalize: "off",
-                                        autocorrect: "off"
-                                    },
-                                    text: "Login password for username " + userName,
-                                    showCancelButton: true,
-                                    focusConfirm: false,
-                                    reverseButtons: true,
-                                    confirmButtonText: "Login",
-                                    cancelButtonText: "Cancel",
-                                    inputValidator: (val) => {
-                                        if (!val) {
-                                            return "Please fill in password";
-                                        }
-                                    }
-                                })
-
-                                if (!swConf.isConfirmed) {
-                                    return;
-                                }
-
-                                if (failCheck >= 3) {
-                                    Swal.fire({
-                                        title: "Login failed",
-                                        theme: 'dark',
-                                        icon: "error",
-                                        text: "Make sure you choose the right user and enter the right password"
-                                    });
-                                }
-
-                                login(userId, swConf.value);
-                            }}
+                        login={login}
                         switchCellColour={switchCellColour}
                         deleteUser={deleteUser}
                         setAuxInfoModal={setAuxInfoModal}

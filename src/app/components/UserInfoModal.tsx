@@ -197,7 +197,7 @@ export const UserInfoModal = ({ show, editMode, auxInfo, initData, closeModal, s
                                         }                                        
                                     }} type="submit"
                                 >
-                                    <FontAwesomeIcon icon={faFloppyDisk} />
+                                    <FontAwesomeIcon icon={ editMode ? faFloppyDisk : faUserPlus} />
                                     <div className="font-bold">{editMode ? "Save" : "Join the group!"}</div>
                                 </button>
                             </div>
