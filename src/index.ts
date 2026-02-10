@@ -7,6 +7,7 @@ const backend = new Hono();
 backend.route('/api/', API);
 
 const server = serve({
+  port: 3001,
   routes: {
     "/api/*": backend.fetch,  // API routes handled first
     "/*": index,          // React app serves everything else

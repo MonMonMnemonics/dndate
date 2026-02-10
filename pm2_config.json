@@ -1,0 +1,7 @@
+{
+  "apps" : [{
+    "name" : "DnDate",
+    "script": "~/.bun/bin/bun run start",
+    "exec_interpreter": "none"
+  }]
+}
