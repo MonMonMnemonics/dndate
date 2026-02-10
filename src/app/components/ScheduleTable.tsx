@@ -14,7 +14,6 @@ type Props = {
     dateStart: string;
     dateEnd: string;
     auxInfoCodes: string[];
-    brushType: number;
 
     login: ((userName: string, userId: number) => void);
     switchCellColour: ((date: string, timeslotIdx: number) => void);
@@ -30,7 +29,6 @@ export const ScheduleTable: FC<Props> = memo(({
     dateStart,
     dateEnd,
     auxInfoCodes,
-    brushType,
 
     login,
     switchCellColour,

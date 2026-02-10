@@ -7,8 +7,14 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBan, faFloppyDisk, faHouse, faInfoCircle, faLeaf, faLockOpen, faMaximize, faMinimize, faPersonChalkboard, faPlus, faQuestionCircle, faSpinner, faUser, faUserPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { auxInfoEnum } from "@/common/consts";
 import { ScheduleTable } from "../components/ScheduleTable";
-import { NewUserModal } from "../components/NewUserModal";
+import { UserInfoModal } from "../components/UserInfoModal";
 import { AuxInfoEditModal } from "../components/AuxInfoEditModal";
+
+interface UserModal {
+    show: boolean,
+    editMode: boolean,
+    initData: {[index:string]: any}
+}
 
 export function Poll() {
     const { token } = useParams();
@@ -36,7 +42,7 @@ export function Poll() {
         }
     }, []);
 
-    async function getPollData(userId: number | null = null, pass: string | null = null) {
+    async function getPollData() {
         const res = await fetch("/api/poll/data", {
             method: "POST",
             headers: {
@@ -91,18 +97,7 @@ export function Poll() {
                     break;
                 }
             }
-        } else if (userId) {
-            const userDt = (data.userData ?? []).find((e: any) => e.id === userId);
-            if (userDt) {
-                setSelectedUser({
-                    id: userId,
-                    host: userDt.host ?? false,
-                    auth: "PASS",
-                    key: pass ?? "",
-                    auxInfo: userDt.auxInfo
-                });
-            }
-        }
+        } 
     }
 
     async function withdrawApplication() {
@@ -338,43 +333,7 @@ export function Poll() {
         }
     }
 
-    async function login(userName: string, userId: number) {
-        const swConf = await Swal.fire({
-            title: "Login",
-            theme: 'dark',
-            input: "password",
-            inputPlaceholder: "password...",
-            inputLabel: "Password",
-            inputAttributes: {
-                autocapitalize: "off",
-                autocorrect: "off"
-            },
-            text: "Login password for username " + userName,
-            showCancelButton: true,
-            focusConfirm: false,
-            reverseButtons: true,
-            confirmButtonText: "Login",
-            cancelButtonText: "Cancel",
-            inputValidator: (val) => {
-                if (!val) {
-                    return "Please fill in password";
-                }
-            }
-        })
-
-        if (!swConf.isConfirmed) {
-            return;
-        }
-
-        if (failCheck >= 3) {
-            Swal.fire({
-                title: "Login failed",
-                theme: 'dark',
-                icon: "error",
-                text: "Make sure you choose the right user and enter the right password"
-            });
-        }
-
+    async function login(userId: number, pass: string) {
         setLoading(true);
         const res = await fetch("/api/poll/login", {
             method: "POST",
@@ -384,7 +343,7 @@ export function Poll() {
             body: JSON.stringify({
                 token: token,
                 userId: userId,
-                pass: swConf.value,
+                pass: pass,
             })
         });
         setLoading(false);
@@ -425,11 +384,11 @@ export function Poll() {
                 id: userId,
                 host: userDt.host ?? false,
                 auth: "PASS",
-                key: swConf.value,
+                key: pass,
                 auxInfo: userDt.auxInfo
             });
+            setBrushType(1);
         }
-
     }
 
     async function save() {
@@ -455,7 +414,7 @@ export function Poll() {
         const userDt = userData.find(usr => usr.id === selectedUser.id);
         if (userDt) {
             setLoading(true);
-            const res = await fetch("/api/poll/save", {
+            const res = await fetch("/api/poll/save-att", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -495,10 +454,14 @@ export function Poll() {
         });
     }
 
-    //-------------------------- NEW MEMBER MODAL --------------------------
-    const [ newModalShow, setNewModalShow ] = useState(false);
+    //-------------------------- USER MODAL --------------------------
+    const [ UserModal, setUserModal ] = useState<UserModal>({
+        show: false,
+        editMode: false,
+        initData: {}
+    });
 
-    async function submitNewUser(name: string, pass: string) {
+    async function submitNewUser(data: {[index: string]: any}) {
         setLoading(true);
         const res = await fetch("/api/poll/create-user", {
             method: "POST",
@@ -506,8 +469,9 @@ export function Poll() {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                name: name,
-                pass: pass,
+                name: data.name,
+                pass: data.pass,
+                auxInfo: data.auxInfo ?? {},
                 token: token
             })
         });
@@ -524,10 +488,81 @@ export function Poll() {
         }
 
         const resData = await res.json();
-        await getPollData(resData.userId, pass);
+        await getPollData();
+
+        setSelectedUser({
+            id: resData.userId,
+            host: false,
+            auth: "PASS",
+            key: data.pass,
+            auxInfo: data.auxInfo ?? {}
+        });
+        
+        setUserModal({
+            show: false,
+            editMode: false,
+            initData: {}
+        });
 
         setLoading(false);
-        setNewModalShow(false);
+        setBrushType(1);
+    }
+
+    async function submitInfoChange(data: {[index: string]: any}) {
+        if (selectedUser.id < 0) {
+            return;
+        }
+
+        const userDt = userData.find(usr => usr.id === selectedUser.id);
+        if (userDt) {
+            setLoading(true);
+            const res = await fetch("/api/poll/save-info", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    token: token,
+                    userData: {
+                        ...selectedUser,
+                        auxInfo: data
+                    },
+                })
+            });
+
+            if (res.status !== 200) {
+                setLoading(false);
+                Swal.fire({
+                    title: "Server Error",
+                    theme: 'dark',
+                    icon: "error",
+                    text: "sorry for the inconvenience, please let admin know."
+                });
+                return;
+            }
+    
+            setUserData(userData.map(usr => {
+                if (usr.id == selectedUser.id) {
+                    usr.auxInfo = {
+                        ...usr.auxInfo,
+                        ...data
+                    };
+                }
+                return usr;
+            }));
+            setLoading(false);
+        } 
+
+        setSelectedUser({
+            ...selectedUser,
+            auxInfo: data
+        });
+
+        setUserModal({
+            show: false,
+            editMode: false,
+            initData: {}
+        });
     }
 
     //-------------------------- AUX INFO MODAL --------------------------
@@ -645,10 +680,13 @@ export function Poll() {
                 </div>
             }
 
-            <NewUserModal
-                show={newModalShow}
-                closeModal={() => setNewModalShow(false)}
-                submitNewUser={submitNewUser}
+            <UserInfoModal
+                show={UserModal.show}
+                editMode={UserModal.editMode}
+                closeModal={() => setUserModal({...UserModal, show: false})}
+                auxInfo={pollData.auxInfo}
+                submitData={(data) => (UserModal.editMode) ? submitInfoChange(data.auxInfo ?? {}) : submitNewUser(data)}
+                initData={UserModal.initData}                
             />
 
             <AuxInfoEditModal
@@ -694,7 +732,11 @@ export function Poll() {
                                     {
                                         ((selectedUser.id == -1) && (pollData.open)) ?
                                         <button className="bg-green-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center"
-                                            onClick={() => setNewModalShow(true)}
+                                            onClick={() => setUserModal({
+                                                show: true,
+                                                editMode: false,
+                                                initData: {}
+                                            })}
                                         >
                                             <div className="font-bold">Join!</div>
                                             <FontAwesomeIcon icon={faPlus} />
@@ -762,7 +804,14 @@ export function Poll() {
                                             {
                                                 (pollData.auxInfo.length > 0) ?
                                                     <button className="bg-blue-600 px-3 py-1 rounded border flex items-center justify-center gap-2 font-light flex flex-row gap-2 items-center text-xl"
-                                                        onClick={() => setShowAuxInfoEditModal(true)} type="button"
+                                                        onClick={() => setUserModal({
+                                                            show: true,
+                                                            editMode: true,
+                                                            initData: {
+                                                                ...selectedUser.auxInfo,
+                                                                name: (userData.find(e => e.id === selectedUser.id)?.name ?? "")
+                                                            }
+                                                        })} type="button"
                                                     >
                                                         <FontAwesomeIcon icon={faInfoCircle} />
                                                         <div className="font-bold">Edit Answer</div>
@@ -862,9 +911,46 @@ export function Poll() {
                         auxInfoCodes={pollData.auxInfoCodes}
                         activeUserId={selectedUser.id}
                         isHost={selectedUser.host}
-                        brushType={brushType}
 
-                        login={login}
+                        login={async (userName: string, userId: number) => {
+                                const swConf = await Swal.fire({
+                                    title: "Login",
+                                    theme: 'dark',
+                                    input: "password",
+                                    inputPlaceholder: "password...",
+                                    inputLabel: "Password",
+                                    inputAttributes: {
+                                        autocapitalize: "off",
+                                        autocorrect: "off"
+                                    },
+                                    text: "Login password for username " + userName,
+                                    showCancelButton: true,
+                                    focusConfirm: false,
+                                    reverseButtons: true,
+                                    confirmButtonText: "Login",
+                                    cancelButtonText: "Cancel",
+                                    inputValidator: (val) => {
+                                        if (!val) {
+                                            return "Please fill in password";
+                                        }
+                                    }
+                                })
+
+                                if (!swConf.isConfirmed) {
+                                    return;
+                                }
+
+                                if (failCheck >= 3) {
+                                    Swal.fire({
+                                        title: "Login failed",
+                                        theme: 'dark',
+                                        icon: "error",
+                                        text: "Make sure you choose the right user and enter the right password"
+                                    });
+                                }
+
+                                login(userId, swConf.value);
+                            }}
                         switchCellColour={switchCellColour}
                         deleteUser={deleteUser}
                         setAuxInfoModal={setAuxInfoModal}
