@@ -8,6 +8,7 @@ import { faBan, faFloppyDisk, faHouse, faInfoCircle, faLeaf, faLockOpen, faMaxim
 import { auxInfoEnum } from "@/common/consts";
 import { ScheduleTable } from "../components/ScheduleTable";
 import { UserInfoModal } from "../components/UserInfoModal";
+import { GetLinkBtn } from "../components/GetLinkBtn";
 
 interface UserModal {
     show: boolean,
@@ -35,13 +36,13 @@ export function Poll() {
     const [ userData, setUserData ] = useState<UserData[]>([]);
 
     useEffect(() => {
-        getPollData();
+        getPollData(true);
         if ((searchParams.get("style") ?? "A").toUpperCase() == "B") {
             setPollStyle("HORIZONTAL");
         }
     }, []);
 
-    async function getPollData() {
+    async function getPollData(firstPull: boolean = false) {
         const res = await fetch("/api/poll/data", {
             method: "POST",
             headers: {
@@ -96,7 +97,36 @@ export function Poll() {
                     break;
                 }
             }
-        } 
+        }
+
+        if (firstPull) {
+            let recentPolls: any = window.localStorage.getItem("recent-polls");
+            if (!recentPolls) {
+                recentPolls = [];
+            } else {
+                try {
+                    recentPolls = JSON.parse(recentPolls);
+                } catch (error) {
+                    recentPolls = [];
+                }
+
+                if (!Array.isArray(recentPolls)) {
+                    recentPolls = [];
+                }
+            }
+
+            recentPolls = recentPolls.filter((e: any) => (e.token ?? "") != token);
+            recentPolls.unshift({
+                token: token,
+                title: data.pollData.title
+            });
+
+            if (recentPolls.length > 10) {
+                recentPolls = recentPolls.slice(10);
+            }
+
+            window.localStorage.setItem("recent-polls", JSON.stringify(recentPolls));
+        }
     }
 
     async function withdrawApplication() {
@@ -740,7 +770,7 @@ export function Poll() {
                             <div className="text-red-500 text-3xl font-bold border border-2 border-red-500 py-1 px-2 rounded">
                                 POLL CLOSED
                             </div>
-                        : null
+                        : <GetLinkBtn token={token ?? ""}/>
                     }
                 </div>
                 {
@@ -789,7 +819,7 @@ export function Poll() {
                                 readOnly={true}
                             />
                             <div className="w-px mx-2 bg-white border-0"/>
-                            <div className="h-full w-[30em] flex flex-col gap-2">
+                            <div className="h-full w-[35em] flex flex-col gap-2">
                                 <div className="flex flex-row w-full justify-center items-center gap-3 font-bold text-2xl">
                                     <FontAwesomeIcon icon={faQuestionCircle}/>
                                     <div>Guide</div>
@@ -801,6 +831,7 @@ export function Poll() {
                                         <li>Just click "Join+" to add your name and fill in your availability.</li>
                                         <li>Click pencil symbol next to your name in the table to edit your answer.</li>
                                         <li>Editing as the host allows you to see extra information submitted.</li>
+                                        <li>Share url link as it is to invite other people.</li>
                                     </ul>
                                 </div>
                             </div>
