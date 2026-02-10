@@ -1,0 +1,28 @@
+on:
+  push:
+    branches: ["master"]
+    
+jobs:
+ build:
+  runs-on: ubuntu-latest
+  steps:
+    - name: Create SSH key
+      shell: bash
+      run: |
+        mkdir -p ~/.ssh/
+        echo "$SSH_KEY" > ~/.ssh/id_key
+        sudo chmod 600 ~/.ssh/id_key
+        cat >>~/.ssh/config <<END
+        Host deploy_server
+          HostName $SSH_HOST
+          User $SSH_USER
+          IdentityFile ~/.ssh/id_key
+          StrictHostKeyChecking no
+        END
+      env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_HOST: ${{ secrets.IP_ADDRESS }}
+          SSH_USER: ${{ secrets.USER_NAME }}
+    - name: Execute deploy command
+      shell: bash
+      run: ssh deploy_server "cd ${{ secrets.DEPLOY_FOLDER }} && git pull && ~/.bun/bin/bun install && ~/.bun/bin/bun --bun run build && pm2 start pm2_config.json && pm2 save"
