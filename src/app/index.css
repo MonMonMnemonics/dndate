@@ -80,6 +80,10 @@ table.poll {
     font-size: x-large;
   }
 
+  .host-unavail {
+    opacity: 0.7;
+  }
+
   th {
     background-color: #1a1a1a;
   }
@@ -144,12 +148,24 @@ table.poll.vertical {
 }
 
 table.poll.horizontal {
-  td.timeslotidx-0 {
-    border-left: 5px solid #F2F3F4;
+  th.timeslotidx-47 {
+    border-right: 5px solid #F2F3F4;
+  }
+
+  td.timeslotidx-47 {
+    border-right: 5px solid #F2F3F4;
+  }
+
+  .first-col {
+    border-right: 5px solid #F2F3F4;
   }
 
   th.timeslot.horizontal.timeslotidx-0 {
     border-left: 5px solid #F2F3F4;
+  }
+
+  .date-header {
+    border-right: 5px solid #F2F3F4;
   }
 }
 

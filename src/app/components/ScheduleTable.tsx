@@ -3,8 +3,9 @@ import moment from "moment";
 import type { FC } from 'react';
 import type { UserData } from '@/common/types';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleInfo, faDiceD20, faHatWizard, faLeaf, faPenToSquare, faPersonChalkboard, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faCalendarDay, faCalendarDays, faCircleInfo, faDiceD20, faLeaf, faPenToSquare, faPersonChalkboard, faShare, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { auxInfoEnum } from "@/common/consts";
+import Swal from 'sweetalert2';
 
 type Props = {
     pollStyle: string;
@@ -14,6 +15,7 @@ type Props = {
     dateStart: string;
     dateEnd: string;
     auxInfoCodes: string[];
+    timeslotHostLock: boolean;
 
     login: ((userName: string, userId: number) => void);
     switchCellColour: ((date: string, timeslotIdx: number) => void);
@@ -29,6 +31,7 @@ export const ScheduleTable: FC<Props> = memo(({
     dateStart,
     dateEnd,
     auxInfoCodes,
+    timeslotHostLock,
 
     login,
     switchCellColour,
@@ -83,24 +86,119 @@ export const ScheduleTable: FC<Props> = memo(({
         setBrushActive(false);
     }
 
+    //-------------------------- AUX COMPONENTS --------------------------
+    const TimeslotCell = (date: string, timeslotIdx: number, user: UserData) => {
+        const dateKey = date + "-" + timeslotIdx.toString();
+        let attType = "open";
+
+        if (hostClosed.includes(dateKey) && timeslotHostLock) {
+            attType = "closed"; 
+        } else if (dateKey in user.attendance) {
+            if (user.attendance[dateKey]) {
+                attType = "preferred";
+            } else {
+                attType = "closed";
+            }
+        }
+
+        if (hostClosed.includes(dateKey)) {
+            attType += " host-unavail"
+        }
+
+        if (timeslotIdx % 2 == 0) {
+            attType += " even";
+        } else {
+            attType += " odd";
+        }
+
+        if (timeslotIdx == 0) {
+            attType += " timeslotidx-0";
+        } else if (timeslotIdx == 47) {
+            attType += " timeslotidx-47";
+        }
+
+        if ((activeUserId == user.id) && ((!hostClosed.includes(dateKey)) || (isHost) || (!timeslotHostLock))) {
+            return <td 
+                key={user.id + "-" + date + "-" + timeslotIdx} className={attType} onMouseUp={mouseLeave}
+                onMouseDown={() => mouseDown(date, timeslotIdx)} onMouseEnter={() => mouseEnter(date, timeslotIdx)}
+            ></td>;
+        } else {
+            return <td 
+                key={user.id + "-" + date + "-" + timeslotIdx}
+                className={attType} onMouseUp={mouseLeave}
+            ></td>;
+        }
+    }
+
+    const DateHeader = (date: string, dateIdx: number) => {
+        let className = "date-header " + pollStyle.toLowerCase();
+        if (pollStyle == "VERTICAL") {
+            if (dateIdx == 0) {
+                className += " first";
+            }
+        }
+
+        return(
+            <th key={'header-' + date} id={"DateHeader-" + date} className={className} colSpan={(pollStyle == "VERTICAL") ? 49 : 48}>
+                <div className='flex flex-row items-center justify-center'>
+                    <div>{moment(date).format('YYYY-MM-DD (dddd)')}</div>
+                    <p title='Jump to date' className='cursor-pointer' 
+                        onClick={async () => {
+                            const res = await Swal.fire({
+                                title: "Jump to date",
+                                input: "date",
+                                theme: "dark",
+                                confirmButtonText: "Jump",
+                                inputAttributes: {
+                                    min: dateStart,
+                                    max: dateEnd,
+                                },
+                                inputValue: date
+                            })
+
+                            if (res.isConfirmed) {
+                                const dateEl = document.getElementById("DateHeader-" + res.value);
+                                if (dateEl) {
+                                    if (pollStyle == "VERTICAL") {
+                                        dateEl.scrollIntoView({
+                                            behavior: "smooth",
+                                            block: "start",
+                                        })
+                                    } else {
+                                        dateEl.scrollIntoView({
+                                            behavior: "smooth",
+                                            inline: "end"
+                                        })
+                                    }                                    
+                                }
+                            }
+                        }}
+                    >
+                        <FontAwesomeIcon icon={faCalendarDays} className='mt-1'/>
+                        </p>
+                </div>                
+            </th>
+        )
+    }
+
     return (
         <div className='relative grow select-none flex flex-col'>
-            <div className="h-full w-full flex flex-col absolute overflow-auto ms-2 pe-2 pb-2">
+            <div className="max-h-full w-full flex flex-col absolute overflow-auto ms-2 pe-2 pb-2">
                 {
                     (pollStyle == "HORIZONTAL") ?
                     <table className='poll me-2 horizontal' style={{ width: 'auto' }}>
                         <thead className="sticky top-0" style={{ zIndex: 2 }}>
                             <tr>
-                                <th rowSpan={2} className='sticky left-0 top-0 align-middle text-center text-2xl' style={{ zIndex: 6 }}>Name</th>
-                                { dates.map(date => (
-                                    <th key={'header-' + date} className="date-header" colSpan={48}>{moment(date).format('YYYY-MM-DD (dddd)')}</th>
-                                ))}
+                                <th rowSpan={2} className='sticky left-0 top-0 align-middle text-center text-2xl first-col' style={{ zIndex: 6 }}>Name</th>
+                                { dates.map((date, dateIdx) => DateHeader(date, dateIdx))}
                             </tr>
                             <tr>
                                 { dates.map((date, dateIdx) => {
                                     return Array.from(Array(24*2).keys()).map((timeslotIdx) => (
                                         <th key={date + "-" + timeslotIdx} style={{ height: '3ch' }}
-                                            className={"timeslot horizontal relative min-w-[3.5ch] max-w-[3.5ch] text-start" + ((timeslotIdx % 2 == 0) ? " even" : " odd") + (((timeslotIdx == 0) && (dateIdx > 0)) ? " timeslotidx-0" : "")}
+                                            className={"timeslot horizontal relative min-w-[3.5ch] max-w-[3.5ch] text-start" 
+                                                + ((timeslotIdx % 2 == 0) ? " even" : " odd") 
+                                                + ((timeslotIdx == 47) ? " timeslotidx-47" : "")}
                                         >
                                             <div className="absolute ps-2 top-0 bg-dark" style={{ zIndex: 4 }}>{(timeslotIdx % 2 == 0) ? timeslotIdx/2 : ""}</div>                                                        
                                         </th>
@@ -111,14 +209,14 @@ export const ScheduleTable: FC<Props> = memo(({
                         <tbody>
                             {userData.map((user, idx) => (
                                 <tr key={'tr-' + idx} style={{ height: '5ch' }} className={(user.id == activeUserId) ? "selected-row" : ""} onMouseLeave={mouseLeave}>
-                                    <th className='sticky text-nowrap left-0 align-middle px-3 min-w-[30ch] name-cell' style={{ zIndex: 1 }}>
+                                    <th className='sticky text-nowrap left-0 align-middle px-3 min-w-[30ch] name-cell first-col' style={{ zIndex: 1 }}>
                                         <div className='flex flex-row items-center gap-3 w-full'>
                                             <div className="me-auto">{user.name}</div>
                                             {
                                                 (user.host == true) ?
                                                 <div className='flex flex-row items-center gap-1'>
                                                     <div>GM</div>
-                                                    <FontAwesomeIcon icon={faHatWizard}/>
+                                                    <FontAwesomeIcon icon={faDiceD20}/>
                                                 </div>
                                                 : null
                                             }
@@ -157,43 +255,7 @@ export const ScheduleTable: FC<Props> = memo(({
                                         </div>
                                     </th>
                                     {dates.map((date) => {
-                                        return Array.from(Array(24*2).keys()).map((idx2) => {
-                                            const dateKey = date + "-" + idx2.toString();
-                                            let attType = "open";
-
-                                            if (hostClosed.includes(dateKey)) {
-                                                attType = "closed";
-                                            } else if (dateKey in user.attendance) {
-                                                if (user.attendance[dateKey]) {
-                                                    attType = "preferred";
-                                                } else {
-                                                    attType = "closed";
-                                                }
-                                            }
-                                            
-                                            if (idx2 % 2 == 0) {
-                                                attType += " even";
-                                            } else {
-                                                attType += " odd";
-                                            }
-
-                                            if (idx2 == 0) {
-                                                attType += " timeslotidx-0";
-                                            } else if (idx2 == 47) {
-                                                attType += " timeslotidx-47";
-                                            }
-
-                                            if ((activeUserId == user.id) && ((!hostClosed.includes(dateKey)) || (isHost))) {
-                                                return <td 
-                                                    key={idx + "-" + date + '-' + idx2} className={attType} onMouseUp={mouseLeave}
-                                                    onMouseDown={() => mouseDown(date, idx2)} onMouseEnter={() => mouseEnter(date, idx2)}
-                                                ></td>;
-                                            } else {
-                                                return <td 
-                                                    key={idx + "-" + date + '-' + idx2} className={attType} onMouseUp={mouseLeave}
-                                                ></td>;
-                                            }                                                
-                                        })
+                                        return Array.from(Array(24*2).keys()).map((idx2) => TimeslotCell(date, idx2, user))
                                     })}
                                 </tr>
                             ))}
@@ -204,7 +266,7 @@ export const ScheduleTable: FC<Props> = memo(({
                         <tbody>
                             {dates.map((date, dateIdx) => 
                                 <Fragment key={'v-' + date}>
-                                    <tr><th colSpan={49} className={"date-header vertical" + ((dateIdx == 0) ? " first" : "")}>{moment(date).format('YYYY-MM-DD (dddd)')}</th></tr>
+                                    <tr>{DateHeader(date, dateIdx)}</tr>
                                     <tr>
                                         <th className="sticky left-0 left-border" style={{ zIndex:6 }}></th>
                                         { Array.from(Array(24*2).keys()).map((timeslotIdx) => (
@@ -268,43 +330,7 @@ export const ScheduleTable: FC<Props> = memo(({
                                                     }
                                                 </div>
                                             </th>
-                                            { Array.from(Array(24*2).keys()).map((idx2) => {
-                                                const dateKey = date + "-" + idx2.toString();
-                                                let attType = "open";
-
-                                                if (hostClosed.includes(dateKey)) {
-                                                    attType = "closed";
-                                                } else if (dateKey in user.attendance) {
-                                                    if (user.attendance[dateKey]) {
-                                                        attType = "preferred";
-                                                    } else {
-                                                        attType = "closed";
-                                                    }
-                                                }
-
-                                                if (idx2 % 2 == 0) {
-                                                    attType += " even";
-                                                } else {
-                                                    attType += " odd";
-                                                }
-
-                                                if (idx2 == 0) {
-                                                    attType += " timeslotidx-0";
-                                                } else if (idx2 == 47) {
-                                                    attType += " timeslotidx-47";
-                                                }
-
-                                                if ((activeUserId == user.id) && ((!hostClosed.includes(dateKey)) || (isHost))) {
-                                                    return <td 
-                                                        key={idx + "-" + date + '-' + idx2} className={attType} onMouseUp={mouseLeave}
-                                                        onMouseDown={() => mouseDown(date, idx2)} onMouseEnter={() => mouseEnter(date, idx2)}
-                                                    ></td>;
-                                                } else {
-                                                    return <td 
-                                                        key={idx + "-" + date + '-' + idx2} className={attType} onMouseUp={mouseLeave}
-                                                    ></td>;
-                                                }                                                
-                                            })}
+                                            { Array.from(Array(24*2).keys()).map((idx2) => TimeslotCell(date, idx2, user)) }
                                         </tr>
                                     ))}
                                 </Fragment>

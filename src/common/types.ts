@@ -21,6 +21,7 @@ export interface PollData {
     dateEnd: string,
     timezone: string,
     open: boolean,
+    timeslotHostLock: boolean,
     auxInfo: {
         id: number,
         code: string

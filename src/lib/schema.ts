@@ -9,9 +9,10 @@ export const poll = sqliteTable("poll", {
     description: text("description").default(""),
     dateStart: text("date_start").notNull(),
     dateEnd: text("date_end").notNull(),
-    timeCreated: integer("time_created").notNull(),
+    deletionTime: integer("deletion_time").notNull(),
     timezone: text("timezone").notNull(),
-    open: integer("opne", {mode: "boolean"}).default(true).notNull()
+    open: integer("open", {mode: "boolean"}).default(true).notNull(),
+    timeslotHostLock: integer("timeslot_host_lock", {mode: "boolean"}).default(false).notNull(),
 }, (table) => [
     check("date_start_check", sql`${table.dateStart} LIKE [0-9][0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]`),
     check("date_end_check", sql`${table.dateEnd} LIKE [0-9][0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]`),

@@ -4,7 +4,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import type { UserData, SelectedUser, PollData } from "@/common/types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBan, faFloppyDisk, faHouse, faInfoCircle, faLeaf, faLockOpen, faMaximize, faMinimize, faPersonChalkboard, faPlus, faQuestionCircle, faSpinner, faUser, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faBan, faFloppyDisk, faHouse, faInfoCircle, faLeaf, faLeftRight, faLockOpen, faMaximize, faMinimize, faPersonChalkboard, faPlus, faQuestionCircle, faSpinner, faUpDown, faUser, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { auxInfoEnum } from "@/common/consts";
 import { ScheduleTable } from "../components/ScheduleTable";
 import { UserInfoModal } from "../components/UserInfoModal";
@@ -20,7 +20,7 @@ export function Poll() {
     const { token } = useParams();
     const [ searchParams ] = useSearchParams();
     const [ pollExist, setPollExist ] = useState(true);
-    const [ pollStyle, setPollStyle ] = useState("VERTICAL");
+    const [ pollStyle, setPollStyle ] = useState("HORIZONTAL");
     const [ fullView, setFullView ] = useState(false);
 
     const [ pollData, setPollData ] = useState<PollData>({
@@ -32,13 +32,14 @@ export function Poll() {
         open: true,
         auxInfo: [],
         auxInfoCodes: [],
+        timeslotHostLock: false
     });
     const [ userData, setUserData ] = useState<UserData[]>([]);
 
     useEffect(() => {
         getPollData(true);
         if ((searchParams.get("style") ?? "A").toUpperCase() == "B") {
-            setPollStyle("HORIZONTAL");
+            setPollStyle("VERTICAL");
         }
     }, []);
 
@@ -571,6 +572,21 @@ export function Poll() {
 
         setLoading(false);
         setBrushType(1);
+
+        const dateEl = document.getElementById("DateHeader-" + pollData.dateStart);
+        if (dateEl) {
+            if (pollStyle == "VERTICAL") {
+                dateEl.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                })
+            } else {
+                dateEl.scrollIntoView({
+                    behavior: "smooth",
+                    inline: "end"
+                })
+            }                                    
+        }
     }
 
     async function submitInfoChange(data: {[index: string]: any}) {
@@ -898,7 +914,7 @@ export function Poll() {
                         : null
                     }
                     <div className="h-full flex flex-row items-center gap-5">
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-2 w-[36ch]">
                             <div className="flex flex-row items-center gap-6">
                                 <div className="flex flex-row items-center gap-2 select-none cursor-pointer" onClick={() => setBrushType(1)}>
                                     {
@@ -923,10 +939,16 @@ export function Poll() {
                                 </div>
                             </div>
                             <div className="text-sm h-[2ch]">
-                                {(selectedUser.id != -1) ? "Click and drag timeslot to fill" : ""
-                            }
+                                Greyed out = Host unavailable{(selectedUser.id != -1) ? ". Click and drag timeslot to fill" : ""}
                             </div>
                         </div>
+                        <button className="bg-dark rounded-xl border border-3 h-full aspect-square flex flex-col"
+                            onClick={() => setPollStyle((pollStyle == "VERTICAL") ? "HORIZONTAL" : "VERTICAL")}
+                        >
+                            <div className="flex my-auto flex-row">
+                                <FontAwesomeIcon icon={(pollStyle == "VERTICAL") ? faLeftRight : faUpDown} className="mx-auto font-bold text-3xl"/>
+                            </div>
+                        </button>
                         <button className="bg-dark rounded-xl border border-3 h-full aspect-square flex flex-col"
                             onClick={() => setFullView(!fullView)}
                         >
@@ -964,6 +986,7 @@ export function Poll() {
                         auxInfoCodes={pollData.auxInfoCodes}
                         activeUserId={selectedUser.id}
                         isHost={selectedUser.host}
+                        timeslotHostLock={pollData.timeslotHostLock}
 
                         login={login}
                         switchCellColour={switchCellColour}

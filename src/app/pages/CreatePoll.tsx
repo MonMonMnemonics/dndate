@@ -53,6 +53,7 @@ export function CreatePoll() {
     const [ pass, setPass ] = useState("");
     const [ title, setTitle ] = useState("");
     const [ desc, setDesc ] = useState("");
+    const [ timeslotHostLock, setTImeslotHostLock ] = useState(false);
     const [ dateStart, setDateStart ] = useState(moment().format('YYYY-MM-DD'));
     const [ dateEnd, setDateEnd ] = useState(moment().add(7, "d").format('YYYY-MM-DD'));
     const [ optsInfo, setOptInfo ]  = useState<string[]>([]);
@@ -89,6 +90,7 @@ export function CreatePoll() {
                 dateStart,
                 dateEnd,
                 timezone,
+                timeslotHostLock,
                 opts: optsInfo.map(key => {
                     if (key in extraOpts) {
                         return extraOpts[key].codes;
@@ -224,21 +226,25 @@ export function CreatePoll() {
                             {timezones.map((tz, idx) => <option key={"opt-" + idx} value={tz}>{tz}</option>)}
                         </select>
                     </div>
+                    <div className="flex flex-row gap-2 items-center w-full cursor-pointer" onClick={() => setTImeslotHostLock(!timeslotHostLock)}>
+                        <input className="w-[1.1em] h-[1.1em]" type="checkbox" checked={timeslotHostLock} readOnly/>
+                        <div>Lock timeslot if host is unavailable.</div>
+                    </div>
                     <div className="flex flex-col gap-1 w-full">
                         <div className="text-nowrap text-xl">Add extra questions:</div>
                         <ul className="list-none">
                             {Object.entries(extraOpts).map(([key, opt]) => (
-                                <li className="flex flex-row gap-2 items-center" key={"opts-" + key}>
-                                    <input className="w-[1.1em] h-[1.1em] cursor-pointer" type="checkbox" checked={optsInfo.includes(key)}
-                                        onChange={() => {
-                                            const idx = optsInfo.indexOf(key);
-                                            if (idx == -1) {
-                                                setOptInfo([...optsInfo, key]);
-                                            } else {
-                                                setOptInfo(optsInfo.filter(e => (e !== key)));
-                                            }
-                                        }}
-                                    />
+                                <li className="flex flex-row gap-2 items-center cursor-pointer" key={"opts-" + key} 
+                                    onClick={() => {
+                                        const idx = optsInfo.indexOf(key);
+                                        if (idx == -1) {
+                                            setOptInfo([...optsInfo, key]);
+                                        } else {
+                                            setOptInfo(optsInfo.filter(e => (e !== key)));
+                                        }
+                                    }}
+                                >
+                                    <input className="w-[1.1em] h-[1.1em]" type="checkbox" checked={optsInfo.includes(key)} readOnly/>
                                     <div>{opt.text}</div>
                                 </li>
                             ))}

@@ -147,16 +147,28 @@ API.post('poll/create', async (ctx) => {
     const reqData = await ctx.req.json();
     const token = Bun.SHA256.hash(Bun.env.APP_ID + moment().toISOString() + reqData.title, "hex");
     const pass = Bun.SHA512.hash(Bun.env.APP_ID + reqData.pass, "hex");
-    const creationDate = moment();
+
+    const todayTime = moment();
+
+    if (moment(reqData.dateStart).add(1, "d").isBefore(todayTime) || (moment(reqData.dateStart).add(-6, "M").isAfter(todayTime))) {
+        ctx.status(400);
+        return ctx.text("NOPE")
+    }
+
+    if (moment(reqData.dateEnd).add(1, "d").isBefore(todayTime) || (moment(reqData.dateEnd).add(-6, "M").isAfter(todayTime))) {
+        ctx.status(400);
+        return ctx.text("NOPE")
+    }
 
     const newPoll = await db.insert(poll).values({
         token: token,
         title: reqData.title,
         description: reqData.desc,
-        timeCreated: (new Date()).getTime()/1000,
+        deletionTime: moment(reqData.dateEnd).valueOf()/1000 + 60*60*24*30,
         dateStart: reqData.dateStart,
         dateEnd: reqData.dateEnd,
         timezone: reqData.timezone,
+        timeslotHostLock: reqData.timeslotHostLock ?? false
     }).returning({ id: poll.id});
 
     await db.insert(user).values({
@@ -329,7 +341,8 @@ API.post("poll/data", async (ctx) => {
             dateStart: poll.dateStart,
             dateEnd: poll.dateEnd,
             timezone: poll.timezone,
-            open: poll.open
+            open: poll.open,
+            timeslotHostLock: poll.timeslotHostLock
         })
         .from(poll)
         .where(eq(poll.token, reqData.token))
@@ -545,8 +558,7 @@ setInterval(() => {
 }, 60*60*1000)
 
 setInterval(async () => {
-    const cutoffTIme = (new Date()).getTime()/1000 + 60*60*24*210;
-    const pollToDelete = await db.select({ id: poll.id }).from(poll).where(lt(poll.timeCreated,  cutoffTIme));
+    const pollToDelete = await db.select({ id: poll.id }).from(poll).where(lt(poll.deletionTime,  (new Date()).getTime()/1000));
     if (pollToDelete.length > 0) {
         await db.delete(poll).where(inArray(poll.id, pollToDelete.map(e => e.id)));
         await db.delete(auxInfo).where(inArray(auxInfo.id, pollToDelete.map(e => e.id)));
@@ -556,6 +568,7 @@ setInterval(async () => {
         await db.delete(attendance).where(inArray(attendance.userId, users.map(e => e.id)));
         await db.delete(userInfo).where(inArray(userInfo.userId, users.map(e => e.id)));
     }
+    console.log(pollToDelete.length);
 }, 24*20*60*1000)
 
 export default API;
